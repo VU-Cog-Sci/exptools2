@@ -36,7 +36,7 @@ class TestSession(Session):
             trial = TestTrial(
                 session=self,
                 trial_nr=trial_nr,
-                phase_durations=(.5, .5),
+                phase_durations=(0.5, 0.5),
                 verbose=True
             )
 
@@ -46,5 +46,5 @@ class TestSession(Session):
 
 if __name__ == '__main__':
 
-    session = TestSession(n_trials=2)
+    session = TestSession(n_trials=10)
     session.run()

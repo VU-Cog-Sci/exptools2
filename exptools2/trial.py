@@ -40,7 +40,7 @@ class Trial:
         # TODO: log responses (e.g., through last-response attribute or something)
         n_phases = len(self.phase_durations)
         phase_durs = self.phase_end - self.phase_start
-        params = dict(phase=[], onset=[], onset_intended=[], duration=[])
+        params = dict(phase=[], onset=[], duration=[])
         for phase in range(n_phases):
             params['phase'].append(phase)
             params['onset'].append(self.phase_start[phase])
