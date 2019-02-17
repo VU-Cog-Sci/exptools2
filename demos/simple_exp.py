@@ -46,5 +46,5 @@ class TestSession(Session):
 
 if __name__ == '__main__':
 
-    session = TestSession(n_trials=10)
+    session = TestSession(n_trials=2)
     session.run()

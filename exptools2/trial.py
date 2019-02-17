@@ -40,12 +40,14 @@ class Trial:
         # TODO: log responses (e.g., through last-response attribute or something)
         n_phases = len(self.phase_durations)
         phase_durs = self.phase_end - self.phase_start
-        params = dict(phase=[], onset=[], duration=[])
+        params = dict(phase=[], onset=[], onset_intended=[], duration=[])
         for phase in range(n_phases):
             params['phase'].append(phase)
             params['onset'].append(self.phase_start[phase])
             params['duration'].append(phase_durs[phase])
 
+        #params['onset_intended'] = ...
+            
         params = pd.DataFrame(params, index=[str(self.trial_nr)]*n_phases)
         params.index.name = 'trial'
         self.session.params.append(params)  # add to session object

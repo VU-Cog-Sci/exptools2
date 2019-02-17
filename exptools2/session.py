@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from psychopy.iohub import launchHubServer
 from psychopy.visual import Window, Circle, TextStim
@@ -30,8 +31,12 @@ class Session:
     def close(self):
         self.exp_stop = self.clock.getTime()
         print("Duration experiment: %.3f\n" % self.exp_stop)
-        params = pd.concat(self.params)
-        print(params)
+        self.params = pd.concat(self.params)
+        print(self.params)
+
+        #deviations = self.params['onset'] - self.params['onset_intended']
+        #mae = np.abs(deviations.values).mean()
+        #print("Mean absolute deviation in onsets: %.4f" % mae)
 
     def init_tracker(self):
 
