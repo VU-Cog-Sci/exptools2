@@ -7,8 +7,9 @@ from psychopy.visual import TextStim
 
 class TestTrial(Trial):
     """ Simple trial with text (trial x) and fixation. """
-    def __init__(self, session, trial_nr, phase_durations=None, verbose=True):
-        super().__init__(session, trial_nr, phase_durations, verbose)
+    def __init__(self, session, trial_nr, parameters=None, phase_durations=None,
+                 load_next_during_phase=None, verbose=True):
+        super().__init__(session, trial_nr, parameters, phase_durations, load_next_during_phase, verbose)
 
     def draw(self):
         """ Draws stimuli """
@@ -23,10 +24,10 @@ class TestTrial(Trial):
 
 class TestSession(Session):
     """ Simple session with x trials. """
-    def __init__(self, n_trials=10, eyetracker_on=False):
+    def __init__(self, settings_file=None, n_trials=10, eyetracker_on=False):
         """ Initializes TestSession object. """
         self.n_trials = n_trials
-        super().__init__(eyetracker_on)
+        super().__init__(settings_file, eyetracker_on)
 
     def run(self):
         """ Runs experiment. """
