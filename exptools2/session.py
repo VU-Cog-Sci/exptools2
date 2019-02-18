@@ -24,7 +24,8 @@ class Session:
 
         # Initialize
         self.settings = self._load_settings()
-        self.win, self.monitor = self._create_window_and_monitor()
+        self.monitor = self._create_monitor()
+        self.win = self._create_window()
         self.mouse = Mouse(**self.settings['mouse'])
         self.default_fix = Circle(self.win, radius=0.01, fillColor='white', edges=1000)
         self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
@@ -39,11 +40,14 @@ class Session:
         with open(self.settings_file, 'r') as f_in:
             return yaml.load(f_in)
 
-    def _create_window_and_monitor(self):
+    def _create_monitor(self):
         monitor = Monitor(**self.settings['monitor'])
         monitor.save()  # needed for iohub eyetracker
-        win = Window(monitor=monitor, **self.settings['window'])
-        return win, monitor
+        return monitor
+
+    def _create_window(self):
+        win = Window(monitor=self.monitor, **self.settings['window'])
+        return win
 
     def _setup_mri_simulator(self):
         args = self.settings['mri'].copy()
