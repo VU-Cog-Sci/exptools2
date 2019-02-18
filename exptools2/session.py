@@ -5,7 +5,7 @@ import pandas as pd
 from psychopy.iohub import launchHubServer
 from psychopy.visual import Window, Circle, TextStim
 from psychopy.event import waitKeys, Mouse
-from psychopy.core import Clock
+from psychopy.core import Clock, getTime
 from psychopy.monitors import Monitor
 from psychopy import logging
 from psychopy.hardware.emulator import SyncGenerator
@@ -16,8 +16,9 @@ class Session:
     def __init__(self, settings_file=None, eyetracker_on=False):
         self.settings_file = settings_file
         self.eyetracker_on=eyetracker_on
-        self.phase_durations = []
         self.clock = Clock()
+        self.timer = Clock()
+        self.start_exp = None
         self.current_trial = None
         self.log = []
         self.logfile = logging.LogFile(f='log.txt', filemode='w', level=logging.EXP)
@@ -55,7 +56,9 @@ class Session:
         return SyncGenerator(**args)
 
     def start_experiment(self):
+        self.start_exp = getTime()  # abs time
         self.clock.reset()
+        self.timer.reset()
 
         if self.mri_simulator is not None:
             self.mri_simulator.start()
@@ -70,21 +73,27 @@ class Session:
         self.exp_stop = self.clock.getTime()
         print(f"Duration experiment: {self.exp_stop:.3f}\n")
         self.log = pd.concat(self.log)
+        self.log['onset_abs'] = self.log['onset'] + self.start_exp
         print(self.log)
 
         if self.mri_simulator is not None:
             self.mri_simulator.stop()
 
-    def init_tracker(self):
+    def init_eyetracker(self):
 
         if not self.eyetracker_on:
             raise ValueError("Cannot initialize eyetracker if eyetracker_on=False!")
 
+        EYETRACKER_NAME = 'eyetracker.hw.sr_research.eyelink.EyeTracker'
         # default_native_data_file_name: et_data
         self.iohub = launchHubServer(
             psychopy_monitor_name=self.monitor.name,
-            datastore_name='should be output file name of subject'
+            datastore_name='test_et',
+            **{EYETRACKER_NAME: {
+                'enable_interface_without_connection': True
+            }}
         )
+
         self.tracker = self.iohub.getDevice('eyetracker.hw.sr_research.eyelink.EyeTracker')
 
     def start_recording_eyetracker(self):

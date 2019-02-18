@@ -6,14 +6,15 @@ from psychopy.visual import TextStim
 from simple_exp import TestTrial, TestSession
 
 
-class TestFMRISession(TestSession):
+class TestEyetrackerSession(TestSession):
     """ Simple session with x trials. """
 
     def run(self):
         """ Runs experiment. """
-        self.display_text('Waiting for scanner', keys=self.settings['mri'].get('sync', 't'))
-        # ^ only real difference with simple_exp
 
+        self.init_eyetracker()
+        self.calibrate_eyetracker()
+        self.start_recording_eyetracker()
         self.start_experiment()
 
         for trial_nr in range(self.n_trials):
@@ -22,7 +23,6 @@ class TestFMRISession(TestSession):
                 session=self,
                 trial_nr=trial_nr,
                 phase_durations=(0.5, 0.5),
-                phase_names=('stim', 'ISI'),
                 verbose=True
             )
 
@@ -32,5 +32,5 @@ class TestFMRISession(TestSession):
 
 if __name__ == '__main__':
 
-    session = TestFMRISession(n_trials=10)
+    session = TestEyetrackerSession(eyetracker_on=True, n_trials=10)
     session.run()

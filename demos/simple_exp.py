@@ -7,18 +7,19 @@ from psychopy.visual import TextStim
 
 class TestTrial(Trial):
     """ Simple trial with text (trial x) and fixation. """
-    def __init__(self, session, trial_nr, parameters=None, phase_durations=None,
-                 load_next_during_phase=None, verbose=True):
-        super().__init__(session, trial_nr, parameters, phase_durations, load_next_during_phase, verbose)
+    def __init__(self, session, trial_nr, phase_durations, phase_names=None,
+                 parameters=None, load_next_during_phase=None, verbose=True):
+        super().__init__(session, trial_nr, phase_durations, phase_names,
+                         parameters, load_next_during_phase, verbose)
 
     def draw(self):
         """ Draws stimuli """
         if self.phase == 0:
-            self.session.default_fix.draw()
-        else:
             stim = TextStim(self.session.win, 'Trial %i' % (self.trial_nr))
             stim.draw()
-
+        else:
+            self.session.default_fix.draw()
+            
         super().draw()
 
 
