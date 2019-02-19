@@ -5,15 +5,28 @@ import pandas as pd
 from psychopy.iohub import launchHubServer
 from psychopy.visual import Window, Circle, TextStim
 from psychopy.event import waitKeys, Mouse
-from psychopy.core import Clock, getTime
+from psychopy.core import Clock, getTime, quit
 from psychopy.monitors import Monitor
 from psychopy import logging
 from psychopy.hardware.emulator import SyncGenerator
+from psychopy import prefs as psychopy_prefs
+
+# TODO:
+# - merge default settings with user settings (overwrite default)
 
 
 class Session:
-
+    """ Base Session class """
     def __init__(self, settings_file=None, eyetracker_on=False):
+        """ Initializes base Session class.
+
+        parameters
+        ----------
+        settings_file : str
+            Path to settings file. If None, default_settings.yml is used
+        eyetracker_on : bool
+            Whether to enable eyetracker
+        """
         self.settings_file = settings_file
         self.eyetracker_on=eyetracker_on
         self.clock = Clock()
@@ -28,18 +41,27 @@ class Session:
         self.monitor = self._create_monitor()
         self.win = self._create_window()
         self.mouse = Mouse(**self.settings['mouse'])
-        self.default_fix = Circle(self.win, radius=0.01, fillColor='white', edges=1000)
+        self.default_fix = Circle(self.win, radius=0.3, fillColor='white', edges=1000)
         self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
         self.tracker = None
 
     def _load_settings(self):
-
+        """ Loads settings and sets preferences. """
         if self.settings_file is None:
             self.settings_file = op.join(op.dirname(__file__), 'default_settings.yml')
             logging.warn(f"Using default logfile ({self.settings_file}")
 
         with open(self.settings_file, 'r') as f_in:
-            return yaml.load(f_in)
+            settings = yaml.load(f_in)
+
+        exp_prefs = settings['preferences']  # set preferences globally
+        for preftype, these_settings in exp_prefs.items():
+            for key, value in these_settings.items():
+                pref_subclass = getattr(psychopy_prefs, preftype)
+                pref_subclass[key] = value
+                setattr(psychopy_prefs, preftype, pref_subclass)
+
+        return settings
 
     def _create_monitor(self):
         monitor = Monitor(**self.settings['monitor'])
@@ -56,9 +78,10 @@ class Session:
         return SyncGenerator(**args)
 
     def start_experiment(self):
+        """ Logs the onset of the start of the experiment """
         self.start_exp = getTime()  # abs time
-        self.clock.reset()
-        self.timer.reset()
+        self.clock.reset()  # resets global clock
+        self.timer.reset()  # phase-timer
 
         if self.mri_simulator is not None:
             self.mri_simulator.start()
@@ -78,6 +101,8 @@ class Session:
 
         if self.mri_simulator is not None:
             self.mri_simulator.stop()
+
+        quit()
 
     def init_eyetracker(self):
 

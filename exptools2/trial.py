@@ -40,6 +40,7 @@ class Trial:
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
         self.phase = 0
+        self.exit_phase = False
         self.log = dict(trial_nr=[], onset=[], duration=[], event_type=[], phase=[], response=[])
         # TODO: also log "absolute" onsets? (since clock was initialized? Because synced to eyetracker)
 
@@ -51,10 +52,17 @@ class Trial:
     def draw(self):
         self.session.win.flip()
 
+    def stop_phase(self):
+        self.exit_phase = True
+
     def get_events(self):
 
         events = getKeys(timeStamped=self.session.clock)
         if events:
+
+            if 'q' in [ev[0] for ev in events]:  # specific key in settings?
+                self.session.close()
+
             for key, t in events:
                 self.log['trial_nr'].append(self.trial_nr)
                 self.log['onset'].append(t)
@@ -94,12 +102,15 @@ class Trial:
             # Maybe not the best solution
             if self.load_next_during_phase == self.phase:
                 self.draw()
-                super().draw()
                 self.session.create_trial(self.trial_nr+1)
 
-            while self.session.timer.getTime() < 0:
+            while self.session.timer.getTime() < 0 and not self.exit_phase:
                 self.draw()
                 self.get_events()
+
+            if self.exit_phase:  # broke out of phase loop
+                self.session.timer.reset()
+                self.exit_phase = False  # reset exit_phase
 
             phase_end = self.session.clock.getTime()
             phase_dur = phase_end - phase_start
