@@ -50,17 +50,21 @@ class Trial:
                 raise ValueError(msg)
 
     def draw(self):
+        """ Flips window """
         self.session.win.flip()
 
     def stop_phase(self):
+        """ Allows you to break out the drawing loop while the phase-duration
+        has not completely passed (e.g., when a user pressed a button). """
         self.exit_phase = True
 
     def get_events(self):
-
+        """ Logs responses """
         events = getKeys(timeStamped=self.session.clock)
         if events:
 
             if 'q' in [ev[0] for ev in events]:  # specific key in settings?
+                self.trial.close()
                 self.session.close()
 
             for key, t in events:
@@ -72,7 +76,7 @@ class Trial:
                 self.log['response'].append(key)
 
     def close(self):
-
+        """ Closes the trial. """
         log = pd.DataFrame(self.log).set_index('trial_nr')
         for param_key, param_value in self.parameters.items():
             log[param_key] = param_value 
@@ -80,7 +84,7 @@ class Trial:
         self.session.log.append(log)  # add to session object
 
     def run(self):
-        " Should not be subclassed unless really necessary"
+        """ Should not be subclassed unless really necessary. """
 
         trial_start = self.session.clock.getTime()  # actual trial start
         msg = f"trial {self.trial_nr} start: {trial_start:.5f}"
