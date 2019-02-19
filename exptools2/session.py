@@ -13,7 +13,7 @@ from psychopy import prefs as psychopy_prefs
 
 # TODO:
 # - merge default settings with user settings (overwrite default)
-
+# - write function that pickles/joblib dump complete exp
 
 class Session:
     """ Base Session class """
