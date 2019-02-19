@@ -114,5 +114,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
 .vscode
-**.iohpid
+**/.iohpid
