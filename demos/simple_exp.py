@@ -19,10 +19,10 @@ class TestTrial(Trial):
 
 class TestSession(Session):
     """ Simple session with x trials. """
-    def __init__(self, settings_file=None, n_trials=10, eyetracker_on=False):
+    def __init__(self, output_str, settings_file=None, n_trials=10, eyetracker_on=False):
         """ Initializes TestSession object. """
         self.n_trials = n_trials
-        super().__init__(settings_file, eyetracker_on)
+        super().__init__(output_str, settings_file, eyetracker_on)
 
     def create_trials(self, durations=(.5, .5), timing='seconds'):
         self.trials = []
@@ -48,7 +48,7 @@ class TestSession(Session):
 
 if __name__ == '__main__':
 
-    session = TestSession(n_trials=5)
+    session = TestSession('sub-01', n_trials=5)
     session.create_trials(durations=(.5, .5), timing='seconds')
     #session.create_trials(durations=(30, 30), timing='frames')
     session.run()

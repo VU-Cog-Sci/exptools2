@@ -22,6 +22,6 @@ class TestFMRISession(TestSession):
 
 if __name__ == '__main__':
 
-    session = TestFMRISession(n_trials=10)
+    session = TestFMRISession('sub-01', n_trials=10)
     session.create_trials(durations=(15, 15), timing='frames')
     session.run()
