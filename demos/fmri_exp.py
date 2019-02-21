@@ -11,22 +11,16 @@ class TestFMRISession(TestSession):
 
     def run(self):
         """ Runs experiment. """
+        
+        self.create_trials()
         self.display_text('Waiting for scanner', keys=self.settings['mri'].get('sync', 't'))
         # ^ only real difference with simple_exp
 
         self.start_experiment()
 
-        for trial_nr in range(self.n_trials):
-
-            trial = TestTrial(
-                session=self,
-                trial_nr=trial_nr,
-                phase_durations=(0.5, 0.5),
-                phase_names=('stim', 'ISI'),
-                verbose=True
-            )
-
+        for trial in self.trials:
             trial.run()
+
         self.close()
 
 

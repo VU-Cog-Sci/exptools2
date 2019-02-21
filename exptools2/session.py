@@ -2,10 +2,10 @@ import yaml
 import os.path as op
 import numpy as np
 import pandas as pd
+from psychopy import core
 from psychopy.iohub import launchHubServer
 from psychopy.visual import Window, Circle, TextStim
 from psychopy.event import waitKeys, Mouse
-from psychopy.core import Clock, getTime, quit
 from psychopy.monitors import Monitor
 from psychopy import logging
 from psychopy.hardware.emulator import SyncGenerator
@@ -29,19 +29,20 @@ class Session:
         """
         self.settings_file = settings_file
         self.eyetracker_on=eyetracker_on
-        self.clock = Clock()
-        self.timer = Clock()
+        self.clock = core.Clock()
+        self.timer = core.Clock()
         self.start_exp = None
         self.current_trial = None
-        self.log = []
+        self.log = dict(trial_nr=[], onset=[], event_type=[], phase=[], response=[], nr_frames=[])
         self.logfile = logging.LogFile(f='log.txt', filemode='w', level=logging.EXP)
+        self.nr_frames = 0  # keeps track of nr of nr of frames per phase
 
         # Initialize
         self.settings = self._load_settings()
         self.monitor = self._create_monitor()
         self.win = self._create_window()
         self.mouse = Mouse(**self.settings['mouse'])
-        self.default_fix = Circle(self.win, radius=0.3, fillColor='white', edges=1000)
+        self.default_fix = Circle(self.win, radius=0.1, fillColor='white', edges=1000)
         self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
         self.tracker = None
 
@@ -49,7 +50,7 @@ class Session:
         """ Loads settings and sets preferences. """
         if self.settings_file is None:
             self.settings_file = op.join(op.dirname(__file__), 'default_settings.yml')
-            logging.warn(f"Using default logfile ({self.settings_file}")
+            logging.warn(f"Using default logfile ({self.settings_file})")
 
         with open(self.settings_file, 'r') as f_in:
             settings = yaml.load(f_in)
@@ -70,16 +71,17 @@ class Session:
 
     def _create_window(self):
         win = Window(monitor=self.monitor, **self.settings['window'])
+        win.flip(clearBuffer=True)
         return win
 
     def _setup_mri_simulator(self):
         args = self.settings['mri'].copy()
         args.pop('simulate')
-        return SyncGenerator(**args)
+        return SyncGenerator(**args)   
 
     def start_experiment(self):
         """ Logs the onset of the start of the experiment """
-        self.start_exp = getTime()  # abs time
+        self.start_exp = core.getTime()  # abs time
         self.clock.reset()  # resets global clock
         self.timer.reset()  # phase-timer
 
@@ -93,16 +95,30 @@ class Session:
         waitKeys(keyList=keys)
 
     def close(self):
-        self.exp_stop = self.clock.getTime()
+
+        self.win.flip(clearBuffer=True)
+        self.exp_stop = self.clock.getTime()  # slightly less accurate
+        dur_last_phase = self.exp_stop - self.log['onset'][-1] 
         print(f"Duration experiment: {self.exp_stop:.3f}\n")
-        self.log = pd.concat(self.log)
+
+        self.log = pd.DataFrame(self.log).set_index('trial_nr')
         self.log['onset_abs'] = self.log['onset'] + self.start_exp
+
+        # Only non-responses have a duration
+        self.log['duration'] = np.nan
+        nonresp_idx = self.log.event_type != 'response'  # might not cover everything
+        durations = np.append(self.log.loc[nonresp_idx, 'onset'].diff().values[1:], dur_last_phase)
+        self.log.loc[nonresp_idx, 'duration'] = durations
+
+        # Same for nr frames
+        nr_frames = np.append(self.log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
+        self.log.loc[nonresp_idx, 'nr_frames'] = nr_frames
         print(self.log)
 
         if self.mri_simulator is not None:
             self.mri_simulator.stop()
 
-        quit()
+        core.quit()
 
     def init_eyetracker(self):
 

@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
-from psychopy.core import CountdownTimer, StaticPeriod
-from psychopy.event  import getKeys
+from psychopy import core
+from psychopy import event
 
 # TODO:
-# - log to session.logfile when appropriate
-
+# - add port_log (like dict(phase=code)) to trial init
+# - currently no way to add extra params to logfile per trial
+# - superweird "bug" where first phase of first trial lasts 0.1 longer
 
 class Trial:
     """ Base class for Trial objects. """
@@ -31,6 +32,16 @@ class Trial:
             If not None, the next trial will be loaded during this phase
         verbose : bool
             Whether to print extra output (mostly timing info)
+
+        attributes
+        ----------
+        phase : int
+            Current phase nr (starting for 0)
+        exit_phase : bool
+            Whether the current phase should be exited (set when calling
+            session.stop_phase())
+        last_resp : str
+            Last response given (for convenience)
         """
         self.session = session
         self.trial_nr = trial_nr
@@ -39,16 +50,36 @@ class Trial:
         self.parameters = dict() if parameters is None else parameters
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
-        self.phase = 0
         self.exit_phase = False
-        self.log = dict(trial_nr=[], onset=[], duration=[], event_type=[], phase=[], response=[])
-        # TODO: also log "absolute" onsets? (since clock was initialized? Because synced to eyetracker)
+        self.phase = 0
+        self.last_resp = None
 
         if self.load_next_during_phase is not None:
             if not callable(getattr(self.session, 'create_trial', None)):
                 msg = "Cannot load next trial if 'create_trial' is not defined in session!"
                 raise ValueError(msg)
-    
+
+    def log_phase_info(self):
+        # Method passed to win.callonFlip, such that the
+        # onsets get logged *exactly* on the screen flip
+        onset = self.session.clock.getTime()
+        msg = f"\tPhase {self.phase} start: {onset:.5f}"
+
+        if self.session.tracker is not None:
+            self.session.tracker.sendMessage(msg)
+
+        if self.verbose:
+            print(msg)
+
+        self.session.log['onset'].append(onset)
+        self.session.log['trial_nr'].append(self.trial_nr)
+        self.session.log['event_type'].append(self.phase_names[self.phase])
+        self.session.log['phase'].append(self.phase)
+        self.session.log['response'].append(np.nan)
+        self.session.log['nr_frames'].append(self.session.nr_frames)
+
+        self.session.nr_frames = 1
+
     def stop_phase(self):
         """ Allows you to break out the drawing loop while the phase-duration
         has not completely passed (e.g., when a user pressed a button). """
@@ -56,80 +87,52 @@ class Trial:
 
     def get_events(self):
         """ Logs responses """
-        events = getKeys(timeStamped=self.session.clock)
+        events = event.getKeys(timeStamped=self.session.clock)
         if events:
 
             if 'q' in [ev[0] for ev in events]:  # specific key in settings?
-                self.trial.close()
                 self.session.close()
 
             for key, t in events:
-                self.log['trial_nr'].append(self.trial_nr)
-                self.log['onset'].append(t)
-                self.log['duration'].append(-1)
-                self.log['event_type'].append('response')
-                self.log['phase'].append(self.phase)
-                self.log['response'].append(key)
+                self.session.log['trial_nr'].append(self.trial_nr)
+                self.session.log['onset'].append(t)
+                self.session.log['event_type'].append('response')
+                self.session.log['phase'].append(self.phase)
+                self.session.log['response'].append(key)
+                self.session.log['nr_frames'].append(np.nan)
 
-    def close(self):
-        """ Closes the trial. """
-        log = pd.DataFrame(self.log).set_index('trial_nr')
-        for param_key, param_value in self.parameters.items():
-            log[param_key] = param_value 
-
-        self.session.log.append(log)  # add to session object
+            self.last_resp = key
 
     def run(self):
         """ Should not be subclassed unless really necessary. """
 
         trial_start = self.session.clock.getTime()  # actual trial start
         msg = f"trial {self.trial_nr} start: {trial_start:.5f}"
-        print(msg)
+        
+        if self.verbose:
+            print(msg)
 
         if self.session.tracker is not None:
             self.session.tracker.sendMessage(msg)
 
         for phase_dur in self.phase_durations:
 
-            phase_start = self.session.clock.getTime()
-            msg = f"\tPhase {self.phase} start: {phase_start:.5f}"
-
-            if self.session.tracker is not None:
-                self.session.tracker.sendMessage(msg)
-
             self.session.timer.add(phase_dur)
-
             # Maybe not the best solution
             if self.load_next_during_phase == self.phase:
                 self.draw()
                 self.session.create_trial(self.trial_nr+1)
 
+            self.session.win.callOnFlip(self.log_phase_info)
             while self.session.timer.getTime() < 0 and not self.exit_phase:
                 self.draw()
                 self.get_events()
                 self.session.win.flip()
+                self.session.nr_frames += 1
 
             if self.exit_phase:  # broke out of phase loop
                 self.session.timer.reset()
                 self.exit_phase = False  # reset exit_phase
-
-            phase_end = self.session.clock.getTime()
-            phase_dur = phase_end - phase_start
-
-            if self.verbose:
-                msg = (
-                    f"\tPhase {self.phase} end: {phase_end:.5f} "
-                    f"(intended dur: {self.phase_durations[self.phase]:.5f}, "
-                    f"actual dur={phase_dur:.5f})" 
-                )
-                print(msg)
-
-            self.log['trial_nr'].append(self.trial_nr)
-            self.log['onset'].append(phase_start)
-            self.log['duration'].append(phase_dur)
-            self.log['event_type'].append(self.phase_names[self.phase])
-            self.log['phase'].append(self.phase)
-            self.log['response'].append(-1)
 
             self.phase += 1  # advance phase
 
@@ -138,5 +141,3 @@ class Trial:
             trial_dur = trial_end - trial_start
             msg = f"\tTrial {self.trial_nr} end: {trial_end:.5f} (dur={trial_dur:.5f})\n"
             print(msg)
-
-        self.close()  # adds onset to session.log
