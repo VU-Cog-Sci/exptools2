@@ -17,20 +17,13 @@ class TestEyetrackerSession(TestSession):
         self.start_recording_eyetracker()
         self.start_experiment()
 
-        for trial_nr in range(self.n_trials):
-
-            trial = TestTrial(
-                session=self,
-                trial_nr=trial_nr,
-                phase_durations=(0.5, 0.5),
-                verbose=True
-            )
-
+        for trial in self.trials:
             trial.run()
         self.close()
 
 
 if __name__ == '__main__':
 
-    session = TestEyetrackerSession(eyetracker_on=True, n_trials=10)
+    session = TestEyetrackerSession('sub-01', eyetracker_on=True, n_trials=10)
+    session.create_trials()
     session.run()
