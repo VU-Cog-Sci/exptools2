@@ -2,6 +2,7 @@ import yaml
 import os.path as op
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from psychopy import core
 from psychopy.iohub import launchHubServer
 from psychopy.visual import Window, TextStim
@@ -108,6 +109,7 @@ class Session:
     def start_experiment(self):
         """ Logs the onset of the start of the experiment """
         self.win.callOnFlip(self._set_exp_start)
+        self.win.recordFrameIntervals = True
         self.win.flip(clearBuffer=True)  # first frame is synchronized to start exp
 
     def _set_exp_start(self):
@@ -134,6 +136,8 @@ class Session:
         self.win.callOnFlip(self._set_exp_stop)
         self.win.flip(clearBuffer=True)
         dur_last_phase = self.exp_stop - self.log['onset'][-1] 
+        self.win.recordFrameIntervals = False
+
         print(f"Duration experiment: {self.exp_stop:.3f}\n")
 
         self.log = pd.DataFrame(self.log).set_index('trial_nr')
@@ -149,6 +153,13 @@ class Session:
         nr_frames = np.append(self.log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
         self.log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(int)
         print(self.log)
+
+        fig, ax = plt.subplots(figsize=(15, 5))
+        ax.plot(self.win.frameIntervals)
+        ax.axhline(1./self.actual_framerate, c='r')
+        ax.axhline(1./self.actual_framerate + 1./self.actual_framerate, c='r', ls='--')
+        ax.set(xlim=(0, len(self.win.frameIntervals)), xlabel='Frame nr', ylabel='Interval (sec.)')
+        fig.savefig('frames.png')
 
         if self.mri_simulator is not None:
             self.mri_simulator.stop()
