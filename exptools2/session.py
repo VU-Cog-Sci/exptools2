@@ -48,7 +48,7 @@ class Session:
     def _load_settings(self):
         """ Loads settings and sets preferences. """
         if self.settings_file is None:
-            self.settings_file = op.join(op.dirname(__file__), 'default_settings.yml')
+            self.settings_file = op.join(op.dirname(__file__), 'data', 'default_settings.yml')
             logging.warn(f"Using default logfile ({self.settings_file}")
 
         with open(self.settings_file, 'r') as f_in:
