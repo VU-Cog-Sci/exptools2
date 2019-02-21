@@ -12,7 +12,7 @@ class Trial:
     """ Base class for Trial objects. """
 
     def __init__(self, session, trial_nr, phase_durations, phase_names=None,
-                 parameters=None, load_next_during_phase=None, verbose=True):
+                 parameters=None, timing='seconds', load_next_during_phase=None, verbose=True):
         """ Initializes Trial objects.
         
         parameters
@@ -28,6 +28,10 @@ class Trial:
             optional (if None, all are named 'stim')
         parameters : dict
             Dict of parameters that needs to be added to the log of this trial
+        timing : str
+            The "units" of the phase durations. Default is 'seconds', where we
+            assume the phase-durations are in seconds. The other option is
+            'frames', where the phase-"duration" refers to the number of frames.
         load_next_during_phase : int (or None)
             If not None, the next trial will be loaded during this phase
         verbose : bool
@@ -48,16 +52,34 @@ class Trial:
         self.phase_durations = phase_durations
         self.phase_names = ['stim'] * len(phase_durations) if phase_names is None else phase_names
         self.parameters = dict() if parameters is None else parameters
+        self.timing = timing
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
         self.exit_phase = False
         self.phase = 0
         self.last_resp = None
+        self._check_params()
 
+    def _check_params(self):
         if self.load_next_during_phase is not None:
             if not callable(getattr(self.session, 'create_trial', None)):
                 msg = "Cannot load next trial if 'create_trial' is not defined in session!"
                 raise ValueError(msg)
+
+            if self.timing == 'frames':
+                raise ValueError("Loading in next trial is only supported when "
+                                 "timing=='seconds'")
+
+        TIMING_OPTS = ['seconds', 'frames']
+        if self.timing not in TIMING_OPTS:
+            raise ValueError("Please set timing to one of %s" % (TIMING_OPTS,))
+
+        if self.timing == 'frames':
+            print(self.phase_durations)
+            if not all([isinstance(dur, int) for dur in self.phase_durations]):
+                raise ValueError("Durations should be integers when timing "
+                                 "is set to 'frames'!")
+
 
     def log_phase_info(self):
         # Method passed to win.callonFlip, such that the
@@ -78,7 +100,7 @@ class Trial:
         self.session.log['response'].append(np.nan)
         self.session.log['nr_frames'].append(self.session.nr_frames)
 
-        self.session.nr_frames = 1
+        self.session.nr_frames = 0
 
     def stop_phase(self):
         """ Allows you to break out the drawing loop while the phase-duration
@@ -89,7 +111,7 @@ class Trial:
         """ Logs responses """
         events = event.getKeys(timeStamped=self.session.clock)
         if events:
-
+            print('nr frames: %i' % self.session.nr_frames)
             if 'q' in [ev[0] for ev in events]:  # specific key in settings?
                 self.session.close()
 
@@ -106,7 +128,9 @@ class Trial:
     def run(self):
         """ Should not be subclassed unless really necessary. """
 
-        trial_start = self.session.clock.getTime()  # actual trial start
+        # Trial start is only for logging purposes; for timing, onsets of
+        # phases should be used
+        trial_start = self.session.clock.getTime()
         msg = f"trial {self.trial_nr} start: {trial_start:.5f}"
         
         if self.verbose:
@@ -115,20 +139,40 @@ class Trial:
         if self.session.tracker is not None:
             self.session.tracker.sendMessage(msg)
 
-        for phase_dur in self.phase_durations:
+        for phase_dur in self.phase_durations:  # loop over phase durations
 
-            self.session.timer.add(phase_dur)
-            # Maybe not the best solution
-            if self.load_next_during_phase == self.phase:
-                self.draw()
-                self.session.create_trial(self.trial_nr+1)
+            # Because the first flip happens when the experiment starts,
+            # we need to compensate for this during the first trial/phase
+            if not self.session.log['onset']:
+                # must be first trial/phase
+                if self.timing == 'seconds':  # subtract duration of one frame
+                    phase_dur -= 1./self.session.actual_framerate*1.05  # +5% to be sure
+                else:  # if timing == 'frames', subtract one frame 
+                    phase_dur -= 1
 
             self.session.win.callOnFlip(self.log_phase_info)
-            while self.session.timer.getTime() < 0 and not self.exit_phase:
+            if self.load_next_during_phase == self.phase:
                 self.draw()
-                self.get_events()
-                self.session.win.flip()
-                self.session.nr_frames += 1
+                self.win.flip()
+                self.session.create_trial(self.trial_nr+1)
+
+            if self.timing == 'seconds':
+                self.session.timer.add(phase_dur)
+                while self.session.timer.getTime() < 0 and not self.exit_phase:
+                    self.draw()
+                    self.session.win.flip()
+                    self.get_events()
+                    self.session.nr_frames += 1
+            else:
+                for _ in range(phase_dur):
+
+                    if self.exit_phase:
+                        break
+
+                    self.draw()
+                    self.session.win.flip()
+                    self.get_events()
+                    self.session.nr_frames += 1
 
             if self.exit_phase:  # broke out of phase loop
                 self.session.timer.reset()

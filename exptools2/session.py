@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from psychopy import core
 from psychopy.iohub import launchHubServer
-from psychopy.visual import Window, Circle, TextStim
+from psychopy.visual import Window, TextStim
 from psychopy.event import waitKeys, Mouse
 from psychopy.monitors import Monitor
 from psychopy import logging
@@ -26,6 +26,27 @@ class Session:
             Path to settings file. If None, default_settings.yml is used
         eyetracker_on : bool
             Whether to enable eyetracker
+
+        attributes
+        ----------
+        settings : dict
+            Dictionary with settings from yaml
+        clock : psychopy Clock
+            Global clock (reset to 0 at start exp)
+        timer : psychopy Clock
+            Timer used to time phases
+        start_exp : float
+            Time at actual start of experiment
+        log : psychopy Logfile
+            Logfile with info about exp (level >= EXP)
+        nr_frames : int
+            Counter for number of frames for each phase
+        win : psychopy Window
+            Current window        
+        default_fix : TextStim
+            Default fixation stim (a TextStim with '+')
+        actual_framerate : float
+            Estimated framerate of monitor
         """
         self.settings_file = settings_file
         self.eyetracker_on=eyetracker_on
@@ -42,7 +63,7 @@ class Session:
         self.monitor = self._create_monitor()
         self.win = self._create_window()
         self.mouse = Mouse(**self.settings['mouse'])
-        self.default_fix = Circle(self.win, radius=0.1, fillColor='white', edges=1000)
+        self.default_fix = TextStim(self.win, '+')
         self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
         self.tracker = None
 
@@ -72,6 +93,10 @@ class Session:
     def _create_window(self):
         win = Window(monitor=self.monitor, **self.settings['window'])
         win.flip(clearBuffer=True)
+        self.actual_framerate = win.getActualFrameRate()
+        t_per_frame = 1. / self.actual_framerate
+        logging.warn(f"Actual framerate: {self.actual_framerate:.5f} "
+                     f"(1 frame = {t_per_frame:.5f})")
         return win
 
     def _setup_mri_simulator(self):
@@ -81,7 +106,11 @@ class Session:
 
     def start_experiment(self):
         """ Logs the onset of the start of the experiment """
-        self.start_exp = core.getTime()  # abs time
+        self.win.callOnFlip(self._set_start_exp)
+        self.win.flip()
+
+    def _set_start_exp(self):
+        self.start_exp = self.clock.getTime()
         self.clock.reset()  # resets global clock
         self.timer.reset()  # phase-timer
 
@@ -112,7 +141,7 @@ class Session:
 
         # Same for nr frames
         nr_frames = np.append(self.log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
-        self.log.loc[nonresp_idx, 'nr_frames'] = nr_frames
+        self.log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(int)
         print(self.log)
 
         if self.mri_simulator is not None:
