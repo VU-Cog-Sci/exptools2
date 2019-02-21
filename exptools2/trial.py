@@ -6,7 +6,7 @@ from psychopy import event
 # TODO:
 # - add port_log (like dict(phase=code)) to trial init
 # - currently no way to add extra params to logfile per trial
-# - superweird "bug" where first phase of first trial lasts 0.1 longer
+
 
 class Trial:
     """ Base class for Trial objects. """
@@ -75,11 +75,9 @@ class Trial:
             raise ValueError("Please set timing to one of %s" % (TIMING_OPTS,))
 
         if self.timing == 'frames':
-            print(self.phase_durations)
             if not all([isinstance(dur, int) for dur in self.phase_durations]):
                 raise ValueError("Durations should be integers when timing "
                                  "is set to 'frames'!")
-
 
     def log_phase_info(self):
         # Method passed to win.callonFlip, such that the
@@ -111,7 +109,6 @@ class Trial:
         """ Logs responses """
         events = event.getKeys(timeStamped=self.session.clock)
         if events:
-            print('nr frames: %i' % self.session.nr_frames)
             if 'q' in [ev[0] for ev in events]:  # specific key in settings?
                 self.session.close()
 

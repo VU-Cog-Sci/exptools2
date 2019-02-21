@@ -35,7 +35,7 @@ class Session:
             Global clock (reset to 0 at start exp)
         timer : psychopy Clock
             Timer used to time phases
-        start_exp : float
+        exp_start : float
             Time at actual start of experiment
         log : psychopy Logfile
             Logfile with info about exp (level >= EXP)
@@ -52,7 +52,8 @@ class Session:
         self.eyetracker_on=eyetracker_on
         self.clock = core.Clock()
         self.timer = core.Clock()
-        self.start_exp = None
+        self.exp_start = None
+        self.exp_stop = None
         self.current_trial = None
         self.log = dict(trial_nr=[], onset=[], event_type=[], phase=[], response=[], nr_frames=[])
         self.logfile = logging.LogFile(f='log.txt', filemode='w', level=logging.EXP)
@@ -71,7 +72,7 @@ class Session:
         """ Loads settings and sets preferences. """
         if self.settings_file is None:
             self.settings_file = op.join(op.dirname(__file__), 'data', 'default_settings.yml')
-            logging.warn(f"Using default logfile ({self.settings_file}")
+            logging.warn(f"Using default logfile ({self.settings_file})")
 
         with open(self.settings_file, 'r') as f_in:
             settings = yaml.load(f_in)
@@ -106,32 +107,37 @@ class Session:
 
     def start_experiment(self):
         """ Logs the onset of the start of the experiment """
-        self.win.callOnFlip(self._set_start_exp)
-        self.win.flip()
+        self.win.callOnFlip(self._set_exp_start)
+        self.win.flip(clearBuffer=True)  # first frame is synchronized to start exp
 
-    def _set_start_exp(self):
-        self.start_exp = self.clock.getTime()
+    def _set_exp_start(self):
+        self.exp_start = self.clock.getTime()
         self.clock.reset()  # resets global clock
         self.timer.reset()  # phase-timer
 
         if self.mri_simulator is not None:
             self.mri_simulator.start()
 
+    def _set_exp_stop(self):
+        self.exp_stop = self.clock.getTime()
+
     def display_text(self, text, keys=['return'], **kwargs):
+        # TODO: keys should be variable
         stim = TextStim(self.win, text=text, **kwargs)
         stim.draw()
         self.win.flip()
         waitKeys(keyList=keys)
 
     def close(self):
-
+        """ 'Closes' experiment. Should always be called, even when
+        experiment is quit manually (saves onsets to file). """
+        self.win.callOnFlip(self._set_exp_stop)
         self.win.flip(clearBuffer=True)
-        self.exp_stop = self.clock.getTime()  # slightly less accurate
         dur_last_phase = self.exp_stop - self.log['onset'][-1] 
         print(f"Duration experiment: {self.exp_stop:.3f}\n")
 
         self.log = pd.DataFrame(self.log).set_index('trial_nr')
-        self.log['onset_abs'] = self.log['onset'] + self.start_exp
+        self.log['onset_abs'] = self.log['onset'] + self.exp_start
 
         # Only non-responses have a duration
         self.log['duration'] = np.nan
