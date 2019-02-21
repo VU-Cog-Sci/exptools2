@@ -48,11 +48,7 @@ class Trial:
             if not callable(getattr(self.session, 'create_trial', None)):
                 msg = "Cannot load next trial if 'create_trial' is not defined in session!"
                 raise ValueError(msg)
-
-    def draw(self):
-        """ Flips window """
-        self.session.win.flip()
-
+    
     def stop_phase(self):
         """ Allows you to break out the drawing loop while the phase-duration
         has not completely passed (e.g., when a user pressed a button). """
@@ -111,6 +107,7 @@ class Trial:
             while self.session.timer.getTime() < 0 and not self.exit_phase:
                 self.draw()
                 self.get_events()
+                self.session.win.flip()
 
             if self.exit_phase:  # broke out of phase loop
                 self.session.timer.reset()

@@ -19,8 +19,6 @@ class TestTrial(Trial):
             stim.draw()
         else:
             self.session.default_fix.draw()
-            
-        super().draw()
 
 
 class TestSession(Session):

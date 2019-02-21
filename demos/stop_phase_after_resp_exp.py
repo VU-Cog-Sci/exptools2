@@ -24,8 +24,6 @@ class TestTrial(Trial):
         else:
             self.session.default_fix.draw()
 
-        super().draw()
-
 
 class TestSession(Session):
     """ Simple session with x trials. """
