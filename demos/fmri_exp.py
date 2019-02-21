@@ -1,8 +1,5 @@
-import sys
-sys.path.append('exptools2')
-from session import Session
-from trial import Trial
-from psychopy.visual import TextStim
+from exptools2.session import Session
+from exptools2.trial import Trial
 from simple_exp import TestTrial, TestSession
 
 
@@ -12,7 +9,6 @@ class TestFMRISession(TestSession):
     def run(self):
         """ Runs experiment. """
         
-        self.create_trials()
         self.display_text('Waiting for scanner', keys=self.settings['mri'].get('sync', 't'))
         # ^ only real difference with simple_exp
 
@@ -27,4 +23,5 @@ class TestFMRISession(TestSession):
 if __name__ == '__main__':
 
     session = TestFMRISession(n_trials=10)
+    session.create_trials(durations=(15, 15), timing='frames')
     session.run()

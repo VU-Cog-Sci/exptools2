@@ -1,16 +1,12 @@
-import sys
-sys.path.append('exptools2')
-from session import Session
-from trial import Trial
+from exptools2.session import Session
+from exptools2.trial import Trial
 from psychopy.visual import TextStim
 
 
 class TestTrial(Trial):
     """ Simple trial with text (trial x) and fixation. """
-    def __init__(self, session, trial_nr, phase_durations, txt=None, phase_names=None,
-                 parameters=None, load_next_during_phase=None, verbose=True):
-        super().__init__(session, trial_nr, phase_durations, phase_names,
-                         parameters, load_next_during_phase, verbose)
+    def __init__(self, session, trial_nr, phase_durations, txt=None, **kwargs):
+        super().__init__(session, trial_nr, phase_durations, **kwargs)
         self.txt = TextStim(self.session.win, txt) 
 
     def draw(self):
@@ -28,15 +24,16 @@ class TestSession(Session):
         self.n_trials = n_trials
         super().__init__(settings_file, eyetracker_on)
 
-    def create_trials(self):
+    def create_trials(self, durations=(.5, .5), timing='seconds'):
         self.trials = []
         for trial_nr in range(self.n_trials):
             self.trials.append(
                 TestTrial(session=self,
                           trial_nr=trial_nr,
-                          phase_durations=(.5, .5),
+                          phase_durations=durations,
                           txt='Trial %i' % trial_nr,
-                          verbose=False)
+                          verbose=False,
+                          timing=timing)
             )
 
     def run(self):
@@ -52,4 +49,6 @@ class TestSession(Session):
 if __name__ == '__main__':
 
     session = TestSession(n_trials=5)
+    session.create_trials(durations=(.5, .5), timing='seconds')
+    #session.create_trials(durations=(30, 30), timing='frames')
     session.run()
