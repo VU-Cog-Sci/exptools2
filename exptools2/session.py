@@ -116,12 +116,13 @@ class Session:
     def _create_monitor(self):
         """ Creates the monitor based on settings and save to disk. """
         monitor = Monitor(**self.settings['monitor'])
+        monitor.setSizePix(self.settings['window']['size'])
         monitor.save()  # needed for iohub eyetracker
         return monitor
 
     def _create_window(self):
         """ Creates a window based on the settings and calculates framerate. """
-        win = Window(monitor=self.monitor, **self.settings['window'])
+        win = Window(monitor=self.monitor.name, **self.settings['window'])
         win.flip(clearBuffer=True)
         self.actual_framerate = win.getActualFrameRate()
         t_per_frame = 1. / self.actual_framerate
