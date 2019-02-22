@@ -1,7 +1,5 @@
-import sys
-sys.path.append('exptools2')
-from session import Session
-from trial import Trial
+from exptools2.session import Session
+from exptools2.trial import Trial
 from psychopy.visual import TextStim
 from simple_exp import TestTrial, TestSession
 

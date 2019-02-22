@@ -233,13 +233,14 @@ class Session:
         # default_native_data_file_name: et_data
         self.iohub = launchHubServer(
             psychopy_monitor_name=self.monitor.name,
-            datastore_name='test_et',
+            #datastore_name='test_et',
             **{EYETRACKER_NAME: {
-                'enable_interface_without_connection': True
+                'enable_interface_without_connection': False,
+                #'default_native_data_file_name': 'test'
             }}
         )
 
-        self.tracker = self.iohub.getDevice('eyetracker.hw.sr_research.eyelink.EyeTracker')
+        self.tracker = self.iohub.devices.eyetracker
 
     def start_recording_eyetracker(self):
         self.tracker.setRecordingState(True)

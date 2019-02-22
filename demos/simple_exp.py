@@ -38,7 +38,6 @@ class TestSession(Session):
 
     def run(self):
         """ Runs experiment. """
-        self.create_trials()
         self.start_experiment()
         for trial in self.trials:
             trial.run()            
