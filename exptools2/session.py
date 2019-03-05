@@ -230,13 +230,10 @@ class Session:
             raise ValueError("Cannot initialize eyetracker if eyetracker_on=False!")
 
         EYETRACKER_NAME = 'eyetracker.hw.sr_research.eyelink.EyeTracker'
-        # default_native_data_file_name: et_data
         self.iohub = launchHubServer(
             psychopy_monitor_name=self.monitor.name,
-            #datastore_name='test_et',
             **{EYETRACKER_NAME: {
                 'enable_interface_without_connection': False,
-                #'default_native_data_file_name': 'test'
             }}
         )
 
