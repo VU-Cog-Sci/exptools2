@@ -1,7 +1,7 @@
 from exptools2.session import Session
 from exptools2.trial import Trial
 from psychopy.visual import TextStim
-
+from exptools2 import utils
 
 class TestTrial(Trial):
     """ Simple trial with text (trial x) and fixation. """
@@ -46,8 +46,10 @@ class TestSession(Session):
 
 
 if __name__ == '__main__':
-
     session = TestSession('sub-01', n_trials=5)
     session.create_trials(durations=(.5, .5), timing='seconds')
     #session.create_trials(durations=(30, 30), timing='frames')
     session.run()
+
+    
+    #utils.save_experiment(session,'sub-01', engine='pickle')
