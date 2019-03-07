@@ -20,13 +20,15 @@ from psychopy import prefs as psychopy_prefs
 
 class Session:
     """ Base Session class """
-    def __init__(self, output_str, settings_file=None, eyetracker_on=False):
+    def __init__(self, output_str, output_dir=None, settings_file=None):
         """ Initializes base Session class.
 
         parameters
         ----------
         output_str : str
             Name (string) for output-files (e.g., 'sub-01_ses-post_run-1')
+        output_dir : str
+            Path to output-directory. Default: $PWD/logs.
         settings_file : str
             Path to settings file. If None, default_settings.yml is used
         eyetracker_on : bool
@@ -34,8 +36,6 @@ class Session:
 
         attributes
         ----------
-        output_dir : str
-            Path to output-directory ($PWD/logs)
         settings : dict
             Dictionary with settings from yaml
         clock : psychopy Clock
@@ -56,16 +56,15 @@ class Session:
             Estimated framerate of monitor
         """
         self.output_str = output_str
-        self.output_dir = op.join(os.getcwd(), 'logs')
+        self.output_dir = op.join(os.getcwd(), 'logs') if output_dir is None else output_dir 
         self.settings_file = settings_file
-        self.eyetracker_on=eyetracker_on
         self.clock = core.Clock()
         self.timer = core.Clock()
         self.exp_start = None
         self.exp_stop = None
         self.current_trial = None
         self.log = dict(trial_nr=[], onset=[], event_type=[], phase=[], response=[], nr_frames=[])
-        self.nr_frames = 0  # keeps track of nr of nr of frames per phase
+        self.nr_frames = 0  # keeps track of nr of nr of frame flips
 
         # Initialize
         self.settings = self._load_settings()
@@ -75,11 +74,9 @@ class Session:
         self.logfile = self._create_logfile()
         self.default_fix = TextStim(self.win, '+')
         self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
-        self.tracker = None
 
     def _load_settings(self):
         """ Loads settings and sets preferences. """
-
         default_settings_path = op.join(op.dirname(__file__), 'data', 'default_settings.yml')
         with open(default_settings_path, 'r') as f_in:
             default_settings = yaml.load(f_in)
@@ -89,7 +86,7 @@ class Session:
             logging.warn("No settings-file given; using default logfile")
         else:
             if not op.isfile(self.settings_file):
-                raise IOError(f"Settings-file ({self.settings_file}) does not exist!")
+                raise IOError(f"Settings-file {self.settings_file} does not exist!")
             
             with open(self.settings_file, 'r') as f_in:
                 user_settings = yaml.load(f_in)
@@ -148,7 +145,7 @@ class Session:
         self.win.flip(clearBuffer=True)  # first frame is synchronized to start exp
 
     def _set_exp_start(self):
-        """ Called upon first win.flip(); timestamps start. """
+        """ Called upon first win.flip(); timestamps start of exp. """
         self.exp_start = self.clock.getTime()
         self.clock.reset()  # resets global clock
         self.timer.reset()  # phase-timer
@@ -157,11 +154,12 @@ class Session:
             self.mri_simulator.start()
 
     def _set_exp_stop(self):
-        """ Called on last win.flip(); timestamps end. """
+        """ Called on last win.flip(); timestamps end of exp. """
         self.exp_stop = self.clock.getTime()
 
-    def display_text(self, text, keys=['return'], **kwargs):
+    def display_text(self, text, keys=None, duration=None, **kwargs):
         """ Displays text on the window and waits for a key response.
+        The 'keys' and 'duration' arguments are mutually exclusive.
 
         parameters
         ----------
@@ -172,11 +170,21 @@ class Session:
         kwargs : key-word args
             Any (set of) parameter(s) passed to TextStim
         """
+        if keys is None and duration is None:
+            raise ValueError("Please set either 'keys' or 'duration'!")
+
+        if keys is not None and duration is not None:
+            raise ValueError("Cannot set both 'keys' and 'duration'!")
 
         stim = TextStim(self.win, text=text, **kwargs)
         stim.draw()
         self.win.flip()
-        waitKeys(keyList=keys)
+
+        if keys is not None:
+            waitKeys(keyList=keys)
+        
+        if duration is not None:
+            core.wait(duration)
 
     def close(self):
         """ 'Closes' experiment. Should always be called, even when
@@ -205,20 +213,46 @@ class Session:
         self.log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(int)
 
         # Save to disk
-        f_out = op.join(self.output_dir, self.output_str + '.tsv')
+        f_out = op.join(self.output_dir, self.output_str + '_events.tsv')
         self.log.to_csv(f_out, sep='\t', index=True)
 
+        # Create figure with frametimes (to check for dropped frames)
         fig, ax = plt.subplots(figsize=(15, 5))
         ax.plot(self.win.frameIntervals)
         ax.axhline(1./self.actual_framerate, c='r')
         ax.axhline(1./self.actual_framerate + 1./self.actual_framerate, c='r', ls='--')
-        ax.set(xlim=(0, len(self.win.frameIntervals)), xlabel='Frame nr', ylabel='Interval (sec.)')
+        ax.set(xlim=(0, len(self.win.frameIntervals) + 1), xlabel='Frame nr', ylabel='Interval (sec.)',
+               ylim=(-0.1, 0.5))
         fig.savefig(op.join(self.output_dir, self.output_str + '_frames.png'))
 
         if self.mri_simulator is not None:
             self.mri_simulator.stop()
 
         core.quit()
+
+
+class EyeTrackerSession(Session):
+    """ EyetrackerSession class."""
+
+    def __init__(self, output_str, eyetracker_on=True, **kwargs):
+        """ Initializes EyetrackerSession class.
+        
+        parameters
+        ----------
+        output_str : str
+            Name (string) for output-files (e.g., 'sub-01_ses-post_run-1')
+        eyetracker_on : bool
+            Whether the eyetracker is actually on
+        kwargs : dict
+            Extra arguments to base Session class initialization
+
+        attributes
+        ----------
+        tracker : Eyetracker object
+            IOHub or Pylink Eyetracker object
+        """
+        super().__init__(output_str, **kwargs)
+        self.eyetracker_on=eyetracker_on
 
     def init_eyetracker(self):
         """ Initializes eyetracker.
