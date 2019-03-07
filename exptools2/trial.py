@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from psychopy import core
 from psychopy import event
+from psychopy import logging
 
 # TODO:
 # - add port_log (like dict(phase=code)) to trial init
@@ -58,6 +59,7 @@ class Trial:
         self.exit_phase = False
         self.phase = 0
         self.last_resp = None
+        self.last_resp_onset = None
         self._check_params()
 
     def _check_params(self):
@@ -84,9 +86,6 @@ class Trial:
         # onsets get logged *exactly* on the screen flip
         onset = self.session.clock.getTime()
         msg = f"\tPhase {self.phase} start: {onset:.5f}"
-
-        if self.session.tracker is not None:
-            self.session.tracker.sendMessage(msg)
 
         if self.verbose:
             print(msg)
@@ -119,8 +118,12 @@ class Trial:
                 self.session.log['phase'].append(self.phase)
                 self.session.log['response'].append(key)
                 self.session.log['nr_frames'].append(np.nan)
+                
+                for param, val in self.parameters.items():
+                    self.session.log[param].append(val)
 
             self.last_resp = key
+            self.last_resp_onset = t
 
     def run(self):
         """ Should not be subclassed unless really necessary. """
@@ -133,14 +136,11 @@ class Trial:
         if self.verbose:
             print(msg)
 
-        if self.session.tracker is not None:
-            self.session.tracker.sendMessage(msg)
-
         for phase_dur in self.phase_durations:  # loop over phase durations
 
             # Because the first flip happens when the experiment starts,
             # we need to compensate for this during the first trial/phase
-            if not self.session.log['onset']:
+            if not self.session.log['onset'] and self.phase == 0:
                 # must be first trial/phase
                 if self.timing == 'seconds':  # subtract duration of one frame
                     phase_dur -= 1./self.session.actual_framerate*1.05  # +5% to be sure
@@ -150,8 +150,20 @@ class Trial:
             self.session.win.callOnFlip(self.log_phase_info)
             if self.load_next_during_phase == self.phase:
                 self.draw()
-                self.win.flip()
-                self.session.create_trial(self.trial_nr+1)
+                self.session.win.flip()
+                
+                load_start = self.session.clock.getTime()
+                try:
+                    self.session.create_trial(self.trial_nr+1)
+                except:
+                    logging.warn('Cannot create trial - probably at last one '
+                                 f'(trial {self.trial_nr})!')
+                    break
+                load_dur = self.session.clock.getTime() - load_start
+
+                if load_dur > phase_dur:
+                    logging.warn(f'Time to load stimulus ({load_dur:.5f}) is longer than'
+                                 f' phase-duration {phase_dur:.5f} (trial {self.trial_nr})!')                    
 
             if self.timing == 'seconds':
                 self.session.timer.add(phase_dur)
@@ -161,7 +173,7 @@ class Trial:
                     self.get_events()
                     self.session.nr_frames += 1
             else:
-                for _ in range(phase_dur):
+                for frame_nr in range(phase_dur):
 
                     if self.exit_phase:
                         break
