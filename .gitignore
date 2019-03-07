@@ -120,3 +120,4 @@ dmypy.json
 **/.iohpid
 **/logs
 
+**/.DS_Store
