@@ -7,7 +7,7 @@ functions:
 save_experiment
     Saves Session object using specified engine
 """
-import pickle
+import dill
 import joblib
 
 
@@ -24,7 +24,7 @@ def save_experiment(session, path, engine='pickle'):
         Select engine to save object, either 'pickle' or 'joblib'
     """
     if engine == 'pickle':
-        pickle.dump(session, open(path, 'wb'))
+        dill.dump(session, open(path, 'wb'))
     elif engine == 'joblib':
         joblib.dump(session, path)
     else:
