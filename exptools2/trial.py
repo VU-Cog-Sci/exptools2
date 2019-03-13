@@ -89,7 +89,7 @@ class Trial:
 
         if self.verbose:
             print(msg)
-
+        
         self.session.log['onset'].append(onset)
         self.session.log['trial_nr'].append(self.trial_nr)
         self.session.log['event_type'].append(self.phase_names[self.phase])
@@ -137,7 +137,6 @@ class Trial:
             print(msg)
 
         for phase_dur in self.phase_durations:  # loop over phase durations
-
             # Because the first flip happens when the experiment starts,
             # we need to compensate for this during the first trial/phase
             if not self.session.log['onset'] and self.phase == 0:

@@ -82,16 +82,17 @@ class Session:
             default_settings = yaml.load(f_in)
 
         if self.settings_file is None:
-            settings = default_settings 
+            settings = default_settings
             logging.warn("No settings-file given; using default logfile")
         else:
             if not op.isfile(self.settings_file):
                 raise IOError(f"Settings-file {self.settings_file} does not exist!")
-            
+
             with open(self.settings_file, 'r') as f_in:
                 user_settings = yaml.load(f_in)
             
-            settings = default_settings.update(user_settings)
+            default_settings.update(user_settings)
+            settings = default_settings
 
         # Write settings to sub dir
         if not op.isdir(self.output_dir):
