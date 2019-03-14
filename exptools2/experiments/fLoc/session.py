@@ -12,18 +12,19 @@ class FLocTrial(Trial):
         super().__init__(session, trial_nr, phase_durations, **kwargs)
 
         if pic == 'baseline':
-            self.pic = self.session.default_fix
+            self.to_draw = self.session.default_fix
         else:
-            spath = op.join(self.session.stim_dir, pic.split('-')[0], pic)
-            self.pic = ImageStim(self.session.win, spath) 
+            spath = op.join(self.session.stim_dir, 'stimuli', pic.split('-')[0], pic)
+            self.session.current_stim.setImage(spath)
+            self.to_draw = self.session.current_stim
 
     def draw(self):
         """ Draws stimuli """
 
         if self.phase == 0:
-            self.pic.draw()
+            self.to_draw.draw()
         else:
-            if isinstance(self.pic, ImageStim):
+            if isinstance(self.to_draw, ImageStim):
                 pass
             else:
                 self.session.default_fix.draw()
@@ -31,25 +32,39 @@ class FLocTrial(Trial):
 
 class FLocSession(Session):
     """ Simple session with x trials. """
-    def __init__(self, output_str, stim_file, stim_dir, rt_cutoff=1,
-                 settings_file=None):
+    def __init__(self, sub, run, output_str, stim_dir, rt_cutoff=1,
+                 output_dir=None, settings_file=None):
         """ Initializes TestSession object. """
 
-        self.stim_file = stim_file
-        self.stim_df = pd.read_csv(stim_file, sep='\t')
+        if not op.isdir(stim_dir):
+            msg = (f"Directory {stim_dir} does not exist!\n"
+                   f"To get the stimuli, simply run the following:\n"
+                   f"git clone https://github.com/VPNL/fLoc.git")
+            raise OSError(msg)
+
         self.stim_dir = stim_dir
         self.rt_cutoff = rt_cutoff
 
+        stim_file = op.join(op.dirname(op.dirname(op.dirname(__file__))),
+                            'data', 'fLoc_trials.tsv')
+        df = pd.read_csv(stim_file, sep='\t')
+        sub_id = f'sub-{sub}'
+        self.stim_df = df.query('sub_id == @sub_id & run == @run')
+        self.stim_df.index = np.arange(0, len(self.stim_df), dtype=int)
         self.trials = []
         self.current_trial = None
-        super().__init__(output_str, settings_file)
+        super().__init__(output_str=output_str, settings_file=settings_file,
+                         output_dir=output_dir)
 
+        self.current_stim = ImageStim(self.win, image=None)
+        
     def create_trial(self, trial_nr):
         
         trial = FLocTrial(
             session=self,
             trial_nr=trial_nr,
             phase_durations=(0.4, 0.1),
+            phase_names=(self.stim_df.loc[trial_nr, 'trial_type'], 'ISI'),
             pic=self.stim_df.loc[trial_nr, 'stim_name'],
             load_next_during_phase=1,
             verbose=True,
@@ -92,7 +107,11 @@ class FLocSession(Session):
                         hits.append(1)
                     watching_response = False
 
-        mean_hits = np.mean(hits) * 100
-        txt = f'{mean_hits:.1f}% correct ({sum(hits)} / {len(hits)})!'
-        self.display_text(txt, duration=1)
+        mean_hits = np.mean(hits) * 100 if hits else 0
+        #txt = f'{mean_hits:.1f}% correct ({sum(hits)} / {len(hits)})!'
+        #self.display_text(txt, duration=1)
+        fname = op.join(self.output_dir, self.output_str + '_accuracy.txt')
+        with open(fname, 'w') as f_out:
+            f_out.write(f'{mean_hits:.3f}')
+
         self.close()
