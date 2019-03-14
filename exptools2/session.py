@@ -13,6 +13,8 @@ from psychopy import logging
 from psychopy.hardware.emulator import SyncGenerator
 from psychopy import prefs as psychopy_prefs
 
+from .stimuli import create_circle_fixation
+
 # TODO:
 # - merge default settings with user settings (overwrite default)
 # - write function that pickles/joblib dump complete exp
@@ -72,7 +74,7 @@ class Session:
         self.win = self._create_window()
         self.mouse = Mouse(**self.settings['mouse'])
         self.logfile = self._create_logfile()
-        self.default_fix = TextStim(self.win, '+')
+        self.default_fix = create_circle_fixation(self.win, radius=0.075, color=(1, 1, 1))
         self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
 
     def _load_settings(self):
@@ -213,6 +215,7 @@ class Session:
         nr_frames = np.append(self.log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
         self.log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(int)
 
+        self.log = self.log.round({'onset': 5, 'onset_abs': 5, 'duration': 5})
         # Save to disk
         f_out = op.join(self.output_dir, self.output_str + '_events.tsv')
         self.log.to_csv(f_out, sep='\t', index=True)
