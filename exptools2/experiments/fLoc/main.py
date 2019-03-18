@@ -11,7 +11,7 @@ from .session import FLocSession
 def main_api(sub, run, settings, stimdir):
 
     if stimdir is None:
-        stimdir = op.join('fLoc', 'stimuli')
+        stimdir = op.abspath('fLoc')
 
     fLoc_session = FLocSession(
         sub=sub, 
