@@ -56,18 +56,27 @@ class FLocSession(Session):
                          output_dir=output_dir)
 
         self.current_stim = ImageStim(self.win, image=None)
+        self.type2condition = dict(child='face', adult='face',
+                                   body='body', limb='body',
+                                   corridor='place', house='place',
+                                   word='character', number='character',
+                                   instrument='object', car='object',
+                                   baseline='')
         
     def create_trial(self, trial_nr):
         
+        stim_type = self.stim_df.loc[trial_nr, 'trial_type']
+
         trial = FLocTrial(
             session=self,
             trial_nr=trial_nr,
             phase_durations=(0.4, 0.1),
-            phase_names=(self.stim_df.loc[trial_nr, 'trial_type'], 'ISI'),
+            phase_names=(stim_type, 'ISI'),
             pic=self.stim_df.loc[trial_nr, 'stim_name'],
             load_next_during_phase=1,
             verbose=True,
-            timing='seconds'
+            timing='seconds',
+            parameters={'trial_type': self.type2condition[stim_type]}
         )
         self.trials.append(trial)
         self.current_trial = trial

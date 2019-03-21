@@ -165,16 +165,12 @@ class Trial:
         except:  # not quite happy about this try/except part ...
             logging.warn('Cannot create trial - probably at last one '
                             f'(trial {self.trial_nr})!')
-            
-            return True
 
         load_dur = self.session.clock.getTime() - load_start
 
         if load_dur > phase_dur:  # overshoot! not good!
             logging.warn(f'Time to load stimulus ({load_dur:.5f}) is longer than'
                             f' phase-duration {phase_dur:.5f} (trial {self.trial_nr})!')
-
-        return False
 
     def run(self):
         """ Runs through phases. Should not be subclassed unless
@@ -195,9 +191,7 @@ class Trial:
 
             # Start loading in next trial during this phase
             if self.load_next_during_phase == self.phase:
-                break_out = self.load_next_trial(phase_dur)
-                if break_out:
-                    break
+                self.load_next_trial(phase_dur)
 
             if self.timing == 'seconds':
                 # Loop until timer is at 0!
