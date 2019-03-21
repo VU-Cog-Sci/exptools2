@@ -15,10 +15,6 @@ from psychopy import prefs as psychopy_prefs
 
 from .stimuli import create_circle_fixation
 
-# TODO:
-# - merge default settings with user settings (overwrite default)
-# - write function that pickles/joblib dump complete exp
-
 
 class Session:
     """ Base Session class """
@@ -32,9 +28,7 @@ class Session:
         output_dir : str
             Path to output-directory. Default: $PWD/logs.
         settings_file : str
-            Path to settings file. If None, default_settings.yml is used
-        eyetracker_on : bool
-            Whether to enable eyetracker
+            Path to settings file. If None, exptools2's default_settings.yml is used
 
         attributes
         ----------
@@ -65,7 +59,7 @@ class Session:
         self.exp_start = None
         self.exp_stop = None
         self.current_trial = None
-        self.log = dict(trial_nr=[], onset=[], event_type=[], phase=[], response=[], nr_frames=[])
+        self.global_log = pd.DataFrame(columns=['trial_nr', 'onset', 'event_type', 'phase', 'response', 'nr_frames'])
         self.nr_frames = 0  # keeps track of nr of nr of frame flips
 
         # Initialize
@@ -75,6 +69,7 @@ class Session:
         self.mouse = Mouse(**self.settings['mouse'])
         self.logfile = self._create_logfile()
         self.default_fix = create_circle_fixation(self.win, radius=0.075, color=(1, 1, 1))
+        self.mri_trigger = None
         self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
 
     def _load_settings(self):
@@ -93,6 +88,7 @@ class Session:
             with open(self.settings_file, 'r') as f_in:
                 user_settings = yaml.load(f_in)
             
+            # Update (and potentially overwrite) default settings
             default_settings.update(user_settings)
             settings = default_settings
 
@@ -101,7 +97,7 @@ class Session:
             os.makedirs(self.output_dir) 
 
         settings_out = op.join(self.output_dir, self.output_str + '_expsettings.yml')
-        with open(settings_out, 'w') as f_out:
+        with open(settings_out, 'w') as f_out:  # write settings to disk
             yaml.dump(settings, f_out, indent=4, default_flow_style=False)
 
         exp_prefs = settings['preferences']  # set preferences globally
@@ -139,6 +135,7 @@ class Session:
         """ Initializes an MRI simulator (if 'mri' in settings). """
         args = self.settings['mri'].copy()
         args.pop('simulate')
+        self.mri_trigger = self.settings['mri']['sync']
         return SyncGenerator(**args)   
 
     def start_experiment(self):
@@ -194,31 +191,31 @@ class Session:
         experiment is quit manually (saves onsets to file). """
         self.win.callOnFlip(self._set_exp_stop)
         self.win.flip(clearBuffer=True)
-        dur_last_phase = self.exp_stop - self.log['onset'][-1] 
         self.win.recordFrameIntervals = False
 
-        print(f"Duration experiment: {self.exp_stop:.3f}\n")
+        print(f"\nDuration experiment: {self.exp_stop:.3f}\n")
 
         if not op.isdir(self.output_dir):
             os.makedirs(self.output_dir)
 
-        self.log = pd.DataFrame(self.log).set_index('trial_nr')
-        self.log['onset_abs'] = self.log['onset'] + self.exp_start
+        self.global_log = pd.DataFrame(self.global_log).set_index('trial_nr')
+        self.global_log['onset_abs'] = self.global_log['onset'] + self.exp_start
 
         # Only non-responses have a duration
-        self.log['duration'] = np.nan
-        nonresp_idx = self.log.event_type != 'response'  # might not cover everything
-        durations = np.append(self.log.loc[nonresp_idx, 'onset'].diff().values[1:], dur_last_phase)
-        self.log.loc[nonresp_idx, 'duration'] = durations
-
+        nonresp_idx = ~self.global_log.event_type.isin(['response', 'trigger'])
+        last_phase_onset = self.global_log.loc[nonresp_idx, 'onset'].iloc[-1]
+        dur_last_phase = self.exp_stop - last_phase_onset 
+        durations = np.append(self.global_log.loc[nonresp_idx, 'onset'].diff().values[1:], dur_last_phase)
+        self.global_log.loc[nonresp_idx, 'duration'] = durations
+        
         # Same for nr frames
-        nr_frames = np.append(self.log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
-        self.log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(int)
+        nr_frames = np.append(self.global_log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
+        self.global_log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(int)
 
-        self.log = self.log.round({'onset': 5, 'onset_abs': 5, 'duration': 5})
-        # Save to disk
+        # Round for readability and save to disk
+        self.global_log = self.global_log.round({'onset': 5, 'onset_abs': 5, 'duration': 5})
         f_out = op.join(self.output_dir, self.output_str + '_events.tsv')
-        self.log.to_csv(f_out, sep='\t', index=True)
+        self.global_log.to_csv(f_out, sep='\t', index=True)
 
         # Create figure with frametimes (to check for dropped frames)
         fig, ax = plt.subplots(figsize=(15, 5))

@@ -32,7 +32,8 @@ class TestSession(Session):
                           trial_nr=trial_nr,
                           phase_durations=durations,
                           txt='Trial %i' % trial_nr,
-                          verbose=False,
+                          parameters=dict(trial_type='even' if trial_nr % 2 == 0 else 'odd'),
+                          verbose=True,
                           timing=timing)
             )
 
@@ -46,9 +47,9 @@ class TestSession(Session):
 
 
 if __name__ == '__main__':
-    session = TestSession('sub-01', n_trials=5)
-    session.create_trials(durations=(.5, .5), timing='seconds')
-    #session.create_trials(durations=(30, 30), timing='frames')
+    session = TestSession('sub-01', n_trials=3)
+    #session.create_trials(durations=(.1, .1), timing='seconds')
+    session.create_trials(durations=(10, 10), timing='frames')
     session.run()
 
     

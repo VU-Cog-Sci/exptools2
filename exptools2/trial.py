@@ -13,9 +13,10 @@ class Trial:
     """ Base class for Trial objects. """
 
     def __init__(self, session, trial_nr, phase_durations, phase_names=None,
-                 parameters=None, timing='seconds', load_next_during_phase=None, verbose=True):
+                 parameters=None, timing='seconds', load_next_during_phase=None,
+                 verbose=True):
         """ Initializes Trial objects.
-        
+
         parameters
         ----------
         session : exptools Session object
@@ -50,19 +51,21 @@ class Trial:
         """
         self.session = session
         self.trial_nr = trial_nr
-        self.phase_durations = phase_durations
+        self.phase_durations = list(phase_durations)
         self.phase_names = ['stim'] * len(phase_durations) if phase_names is None else phase_names
         self.parameters = dict() if parameters is None else parameters
         self.timing = timing
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
+        
+        self.start_trial = None
         self.exit_phase = False
+        self.n_phase = len(phase_durations)
         self.phase = 0
-        self.last_resp = None
-        self.last_resp_onset = None
         self._check_params()
 
     def _check_params(self):
+        """ Checks whether parameters/settings are valid. """
         if self.load_next_during_phase is not None:
             if not callable(getattr(self.session, 'create_trial', None)):
                 msg = "Cannot load next trial if 'create_trial' is not defined in session!"
@@ -82,20 +85,35 @@ class Trial:
                                  "is set to 'frames'!")
 
     def log_phase_info(self):
-        # Method passed to win.callonFlip, such that the
-        # onsets get logged *exactly* on the screen flip
+        """ Method passed to win.callonFlip, such that the
+        onsets get logged *exactly* on the screen flip. """
         onset = self.session.clock.getTime()
+
+        if self.phase == 0:
+            self.start_trial = onset
+            
+            if self.verbose:
+                print(f'Starting trial {self.trial_nr}')
+
         msg = f"\tPhase {self.phase} start: {onset:.5f}"
 
         if self.verbose:
             print(msg)
         
-        self.session.log['onset'].append(onset)
-        self.session.log['trial_nr'].append(self.trial_nr)
-        self.session.log['event_type'].append(self.phase_names[self.phase])
-        self.session.log['phase'].append(self.phase)
-        self.session.log['response'].append(np.nan)
-        self.session.log['nr_frames'].append(self.session.nr_frames)
+        # add to global log
+        idx = self.session.global_log.shape[0]
+        self.session.global_log.loc[idx, 'onset'] = onset
+        self.session.global_log.loc[idx, 'trial_nr'] = self.trial_nr
+        self.session.global_log.loc[idx, 'event_type'] = self.phase_names[self.phase]
+        self.session.global_log.loc[idx, 'phase'] = self.phase
+        self.session.global_log.loc[idx, 'nr_frames'] = self.session.nr_frames
+
+        for param, val in self.parameters.items():  # add parameters to log
+            self.session.global_log.loc[idx, param] = val
+
+        # add to trial_log
+        #idx = self.trial_log.shape[0]
+        #self.trial_log.loc[idx, 'onset'][self.phase].append(onset)
 
         self.session.nr_frames = 0
 
@@ -105,66 +123,82 @@ class Trial:
         self.exit_phase = True
 
     def get_events(self):
-        """ Logs responses """
+        """ Logs responses/triggers """
         events = event.getKeys(timeStamped=self.session.clock)
         if events:
             if 'q' in [ev[0] for ev in events]:  # specific key in settings?
                 self.session.close()
 
             for key, t in events:
-                self.session.log['trial_nr'].append(self.trial_nr)
-                self.session.log['onset'].append(t)
-                self.session.log['event_type'].append('response')
-                self.session.log['phase'].append(self.phase)
-                self.session.log['response'].append(key)
-                self.session.log['nr_frames'].append(np.nan)
-                
+
+                if key == self.session.mri_trigger:
+                    event_type = 'pulse'
+                else:
+                    event_type = 'response'
+
+                idx = self.session.global_log.shape[0]
+                self.session.global_log.loc[idx, 'trial_nr'] = self.trial_nr
+                self.session.global_log.loc[idx, 'onset'] = t
+                self.session.global_log.loc[idx, 'event_type'] = event_type
+                self.session.global_log.loc[idx, 'phase'] = self.phase
+                self.session.global_log.loc[idx, 'response'] = key
+
                 for param, val in self.parameters.items():
-                    self.session.log[param].append(val)
+                    self.session.global_log.loc[idx, param] = val
+
+                #self.trial_log['response_key'][self.phase].append(key)
+                #self.trial_log['response_onset'][self.phase].append(t)
+                #self.trial_log['response_time'][self.phase].append(t - self.start_trial)
 
             self.last_resp = key
             self.last_resp_onset = t
 
-    def run(self):
-        """ Should not be subclassed unless really necessary. """
+    def load_next_trial(self):
+        self.draw()  # draw this phase, then load
+        self.session.win.flip()
 
-        # Trial start is only for logging purposes; for timing, onsets of
-        # phases should be used
-        trial_start = self.session.clock.getTime()
-        msg = f"trial {self.trial_nr} start: {trial_start:.5f}"
-        
-        if self.verbose:
-            print(msg)
+        load_start = self.session.clock.getTime()
+        try:
+            self.session.create_trial(self.trial_nr+1)
+        except:  # not quite happy about this try/except part ...
+            logging.warn('Cannot create trial - probably at last one '
+                            f'(trial {self.trial_nr})!')
+            
+            return True
+
+        load_dur = self.session.clock.getTime() - load_start
+
+        if load_dur > phase_dur:  # overshoot! not good!
+            logging.warn(f'Time to load stimulus ({load_dur:.5f}) is longer than'
+                            f' phase-duration {phase_dur:.5f} (trial {self.trial_nr})!')
+
+        return False
+
+    def run(self):
+        """ Runs through phases. Should not be subclassed unless
+        really necessary. """
+
+        # Because the first flip happens when the experiment starts,
+        # we need to compensate for this during the first trial/phase
+        if self.session.nr_frames == 0:
+            # must be first trial/phase
+            if self.timing == 'seconds':  # subtract duration of one frame
+                self.phase_durations[0] -= 1./self.session.actual_framerate * 1.05  # +5% to be sure
+            else:  # if timing == 'frames', subtract one frame 
+                self.phase_durations[0] -= 1
 
         for phase_dur in self.phase_durations:  # loop over phase durations
-            # Because the first flip happens when the experiment starts,
-            # we need to compensate for this during the first trial/phase
-            if not self.session.log['onset'] and self.phase == 0:
-                # must be first trial/phase
-                if self.timing == 'seconds':  # subtract duration of one frame
-                    phase_dur -= 1./self.session.actual_framerate*1.05  # +5% to be sure
-                else:  # if timing == 'frames', subtract one frame 
-                    phase_dur -= 1
 
             self.session.win.callOnFlip(self.log_phase_info)
-            if self.load_next_during_phase == self.phase:
-                self.draw()
-                self.session.win.flip()
-                
-                load_start = self.session.clock.getTime()
-                try:
-                    self.session.create_trial(self.trial_nr+1)
-                except:
-                    logging.warn('Cannot create trial - probably at last one '
-                                 f'(trial {self.trial_nr})!')
-                    break
-                load_dur = self.session.clock.getTime() - load_start
 
-                if load_dur > phase_dur:
-                    logging.warn(f'Time to load stimulus ({load_dur:.5f}) is longer than'
-                                 f' phase-duration {phase_dur:.5f} (trial {self.trial_nr})!')                    
+            # Start loading in next trial during this phase
+            if self.load_next_during_phase == self.phase:
+                break_out = self.load_next_trial()
+                if break_out:
+                    break
 
             if self.timing == 'seconds':
+                # Loop until timer is at 0!
                 self.session.timer.add(phase_dur)
                 while self.session.timer.getTime() < 0 and not self.exit_phase:
                     self.draw()
@@ -172,6 +206,9 @@ class Trial:
                     self.get_events()
                     self.session.nr_frames += 1
             else:
+                # Loop for a predetermined number of frames
+                # Note: only works when you're sure you're not 
+                # dropping frames
                 for frame_nr in range(phase_dur):
 
                     if self.exit_phase:
@@ -187,9 +224,3 @@ class Trial:
                 self.exit_phase = False  # reset exit_phase
 
             self.phase += 1  # advance phase
-
-        if self.verbose:
-            trial_end = self.session.clock.getTime()
-            trial_dur = trial_end - trial_start
-            msg = f"\tTrial {self.trial_nr} end: {trial_end:.5f} (dur={trial_dur:.5f})\n"
-            print(msg)
