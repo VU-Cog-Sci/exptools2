@@ -13,7 +13,7 @@ from psychopy import logging
 from psychopy.hardware.emulator import SyncGenerator
 from psychopy import prefs as psychopy_prefs
 
-from .stimuli import create_circle_fixation
+from ..stimuli import create_circle_fixation
 
 
 class Session:
@@ -74,9 +74,10 @@ class Session:
 
     def _load_settings(self):
         """ Loads settings and sets preferences. """
-        default_settings_path = op.join(op.dirname(__file__), 'data', 'default_settings.yml')
+        default_settings_path = op.join(op.dirname(op.dirname(__file__)),
+                                        'data', 'default_settings.yml')
         with open(default_settings_path, 'r') as f_in:
-            default_settings = yaml.load(f_in)
+            default_settings = yaml.safe_load(f_in)
 
         if self.settings_file is None:
             settings = default_settings
@@ -86,7 +87,7 @@ class Session:
                 raise IOError(f"Settings-file {self.settings_file} does not exist!")
 
             with open(self.settings_file, 'r') as f_in:
-                user_settings = yaml.load(f_in)
+                user_settings = yaml.safe_load(f_in)
             
             # Update (and potentially overwrite) default settings
             default_settings.update(user_settings)

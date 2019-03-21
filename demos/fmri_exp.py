@@ -1,5 +1,3 @@
-from exptools2.session import Session
-from exptools2.trial import Trial
 from simple_exp import TestTrial, TestSession
 
 

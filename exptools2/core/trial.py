@@ -62,6 +62,8 @@ class Trial:
         self.exit_phase = False
         self.n_phase = len(phase_durations)
         self.phase = 0
+        self.last_resp = None
+        self.last_resp_onset = None
         self._check_params()
 
     def _check_params(self):
@@ -153,7 +155,7 @@ class Trial:
             self.last_resp = key
             self.last_resp_onset = t
 
-    def load_next_trial(self):
+    def load_next_trial(self, phase_dur):
         self.draw()  # draw this phase, then load
         self.session.win.flip()
 
@@ -193,7 +195,7 @@ class Trial:
 
             # Start loading in next trial during this phase
             if self.load_next_during_phase == self.phase:
-                break_out = self.load_next_trial()
+                break_out = self.load_next_trial(phase_dur)
                 if break_out:
                     break
 

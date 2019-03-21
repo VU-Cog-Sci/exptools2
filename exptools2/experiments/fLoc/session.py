@@ -1,9 +1,8 @@
 import os.path as op
 import pandas as pd
 import numpy as np
-from exptools2.session import Session
-from exptools2.trial import Trial
 from psychopy.visual import ImageStim
+from ...core import Session, Trial
 
 
 class FLocTrial(Trial):

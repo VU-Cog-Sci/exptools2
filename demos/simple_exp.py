@@ -1,5 +1,5 @@
-from exptools2.session import Session
-from exptools2.trial import Trial
+from exptools2.core import Session
+from exptools2.core import Trial
 from psychopy.visual import TextStim
 from exptools2 import utils
 
@@ -47,9 +47,9 @@ class TestSession(Session):
 
 
 if __name__ == '__main__':
-    session = TestSession('sub-01', n_trials=3)
-    #session.create_trials(durations=(.1, .1), timing='seconds')
-    session.create_trials(durations=(10, 10), timing='frames')
+    session = TestSession('sub-01', n_trials=100)
+    session.create_trials(durations=(.1, .1), timing='seconds')
+    #session.create_trials(durations=(10, 10), timing='frames')
     session.run()
 
     
