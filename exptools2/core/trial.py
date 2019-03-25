@@ -181,12 +181,11 @@ class Trial:
         if self.session.nr_frames == 0:
             # must be first trial/phase
             if self.timing == 'seconds':  # subtract duration of one frame
-                self.phase_durations[0] -= 1./self.session.actual_framerate * 1.05  # +5% to be sure
+                self.phase_durations[0] -= 1./self.session.actual_framerate * 1.1  # +10% to be sure
             else:  # if timing == 'frames', subtract one frame 
                 self.phase_durations[0] -= 1
 
         for phase_dur in self.phase_durations:  # loop over phase durations
-
             self.session.win.callOnFlip(self.log_phase_info)
 
             # Start loading in next trial during this phase

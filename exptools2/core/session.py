@@ -139,20 +139,38 @@ class Session:
         self.mri_trigger = self.settings['mri']['sync']
         return SyncGenerator(**args)   
 
-    def start_experiment(self):
-        """ Logs the onset of the start of the experiment """
-        self.win.callOnFlip(self._set_exp_start)
-        self.win.recordFrameIntervals = True
-        self.win.flip(clearBuffer=True)  # first frame is synchronized to start exp
-
-    def _set_exp_start(self):
-        """ Called upon first win.flip(); timestamps start of exp. """
+    def start_experiment(self, wait_n_triggers=None):
+        """ Logs the onset of the start of the experiment.
+        
+        Parameters
+        ----------
+        wait_n_triggers : int (or None)
+            Number of MRI-triggers ('syncs') to wait before actually
+            starting the experiment. This is useful when you have 
+            'dummy' scans that send triggers to the stimulus-PC.
+            Note: clock is still reset right after calling this
+            method.
+        """
         self.exp_start = self.clock.getTime()
         self.clock.reset()  # resets global clock
         self.timer.reset()  # phase-timer
 
         if self.mri_simulator is not None:
             self.mri_simulator.start()
+
+        self.win.recordFrameIntervals = True
+
+        if wait_n_triggers is not None:
+            print(f'Waiting {wait_n_triggers} triggers before starting ...')
+            n_triggers = 0
+            while n_triggers < wait_n_triggers:
+                waitKeys(keyList=[self.settings['mri'].get('sync', 't')])
+                n_triggers += 1
+                msg = f'\tOnset trigger {n_triggers}: {self.clock.getTime(): .5f}'
+                msg = msg + '\n' if n_triggers == wait_n_triggers else msg
+                print(msg)
+
+            self.timer.reset()
 
     def _set_exp_stop(self):
         """ Called on last win.flip(); timestamps end of exp. """
