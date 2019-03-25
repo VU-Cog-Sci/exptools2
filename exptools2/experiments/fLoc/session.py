@@ -31,8 +31,8 @@ class FLocTrial(Trial):
 
 class FLocSession(Session):
     """ Simple session with x trials. """
-    def __init__(self, sub, run, output_str, stim_dir, rt_cutoff=1,
-                 output_dir=None, settings_file=None):
+    def __init__(self, sub, run, output_str, stim_dir, scrambled, dummies,
+                 rt_cutoff=1, output_dir=None, settings_file=None):
         """ Initializes TestSession object. """
 
         if not op.isdir(stim_dir):
@@ -42,16 +42,23 @@ class FLocSession(Session):
             raise OSError(msg)
 
         self.stim_dir = stim_dir
+        self.scrambled = scrambled
+        self.dummies = dummies
         self.rt_cutoff = rt_cutoff
 
-        stim_file = op.join(op.dirname(op.dirname(op.dirname(__file__))),
-                            'data', 'fLoc_trials.tsv')
+        trials_dir = op.join(op.dirname(op.dirname(op.dirname(__file__))), 'data')
+        if scrambled:
+            stim_file =  op.join(trials_dir, 'fLoc_trials_with_scrambled.tsv')
+        else:
+            stim_file =  op.join(trials_dir, 'fLoc_trials.tsv')
+
         df = pd.read_csv(stim_file, sep='\t')
         sub_id = f'sub-{sub}'
         self.stim_df = df.query('sub_id == @sub_id & run == @run')
         self.stim_df.index = np.arange(0, len(self.stim_df), dtype=int)
         self.trials = []
         self.current_trial = None
+
         super().__init__(output_str=output_str, settings_file=settings_file,
                          output_dir=output_dir)
 
@@ -61,23 +68,28 @@ class FLocSession(Session):
                                    corridor='place', house='place',
                                    word='character', number='character',
                                    instrument='object', car='object',
-                                   baseline='')
-        
+                                   scrambled='scrambled', scrambled1='scrambled',
+                                   scrambled2='scrambled', baseline='')
+
     def create_trial(self, trial_nr):
         
         stim_type = self.stim_df.loc[trial_nr, 'trial_type']
+        stim_name = self.stim_df.loc[trial_nr, 'stim_name']
+        task_probe = self.stim_df.loc[trial_nr, 'task_prob']
 
         trial = FLocTrial(
             session=self,
             trial_nr=trial_nr,
             phase_durations=(0.4, 0.1),
             phase_names=(stim_type, 'ISI'),
-            pic=self.stim_df.loc[trial_nr, 'stim_name'],
+            pic=stim_name,
             load_next_during_phase=1,
             verbose=True,
             timing='seconds',
-            parameters={'trial_type': self.type2condition[stim_type]}
+            parameters={'trial_type': self.type2condition[stim_type],
+                        'stim_name': stim_name, 'task_probe': task_probe}
         )
+
         self.trials.append(trial)
         self.current_trial = trial
 
@@ -87,7 +99,7 @@ class FLocSession(Session):
         watching_response = False
         self.create_trial(trial_nr=0)
         self.display_text('Waiting for scanner', keys=self.settings['mri'].get('sync', 't'))
-        self.start_experiment()
+        self.start_experiment(wait_n_triggers=self.dummies)
 
         hits = []
         for trial_nr in range(self.stim_df.shape[0]):

@@ -6,9 +6,11 @@ from .session import FLocSession
 @click.command()
 @click.option('--sub', default='01', type=str, help='Subject nr (e.g., 01)')
 @click.option('--run', default=1, type=int, help='Run nr')
+@click.option('--dummies', default=None, type=int, help='Number of dummy scans')
+@click.option('--scrambled', is_flag=True, help='Whether to include scrambled category')
 @click.option('--settings', default=None, type=str, help='Settings file')
 @click.option('--stimdir', default=None, type=str, help='fLoc stimulus directory')
-def main_api(sub, run, settings, stimdir):
+def main_api(sub, run, dummies, scrambled, settings, stimdir):
 
     if stimdir is None:
         stimdir = op.abspath('fLoc')
@@ -19,6 +21,8 @@ def main_api(sub, run, settings, stimdir):
         output_str=f'sub-{sub}_task-localizer_run-{run}',
         settings_file=settings,
         stim_dir=stimdir,
+        scrambled=scrambled,
+        dummies=dummies
     )
 
     fLoc_session.run()
