@@ -26,3 +26,4 @@ def main_api(sub, run, dummies, scrambled, settings, stimdir):
     )
 
     fLoc_session.run()
+    fLoc_session.quit()

@@ -249,6 +249,14 @@ class Session:
         if self.mri_simulator is not None:
             self.mri_simulator.stop()
 
+        self.win.close()
+
+    def quit(self):
+        """ Quits Python tread (and window if necessary). """
+
+        if not self.win._closed:
+            self.close()
+
         core.quit()
 
 

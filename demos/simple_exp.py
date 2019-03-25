@@ -44,3 +44,13 @@ class TestSession(Session):
             trial.run()            
 
         self.close()
+
+
+if __name__ == '__main__':
+
+    session = TestSession('sub-01', n_trials=10)
+    session.create_trials(durations=(.1, .1), timing='seconds')
+    #session.create_trials(durations=(3, 3), timing='frames')
+    session.run()
+    #utils.save_experiment(session, 'sub-01', engine='joblib')
+    session.quit()

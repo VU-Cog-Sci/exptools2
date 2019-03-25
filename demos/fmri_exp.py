@@ -23,3 +23,4 @@ if __name__ == '__main__':
     session = TestFMRISession('sub-01', n_trials=10)
     session.create_trials(durations=(0.5, .5), timing='seconds')
     session.run()
+    session.quit()
