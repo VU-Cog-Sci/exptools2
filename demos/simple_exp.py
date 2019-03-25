@@ -47,8 +47,8 @@ class TestSession(Session):
 
 
 if __name__ == '__main__':
-    session = TestSession('sub-01', n_trials=10)
-    session.create_trials(durations=(.2, .2), timing='seconds')
+    session = TestSession('sub-01', n_trials=1000)
+    session.create_trials(durations=(.1, .1), timing='seconds')
     #session.create_trials(durations=(3, 3), timing='frames')
     session.run()
 

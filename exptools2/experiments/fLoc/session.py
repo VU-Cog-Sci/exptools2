@@ -35,12 +35,18 @@ class FLocSession(Session):
                  rt_cutoff=1, output_dir=None, settings_file=None):
         """ Initializes TestSession object. """
 
+        msg = ("When using this localizer, please acknowledge the original "
+               "creators of the task (Stigliani et al.); for more info "
+               "about how to cite the original authors, check "
+               "http://vpnl.stanford.edu/fLoc\n")
+        print(msg)
+
         if not op.isdir(stim_dir):
             msg = (f"Directory {stim_dir} does not exist!\n"
                    f"To get the stimuli, simply run the following:\n"
-                   f"git clone https://github.com/VPNL/fLoc.git")
+                   f"git clone https://github.com/FEED-UvA/fLoc.git")
             raise OSError(msg)
-
+            
         self.stim_dir = stim_dir
         self.scrambled = scrambled
         self.dummies = dummies
@@ -75,7 +81,7 @@ class FLocSession(Session):
         
         stim_type = self.stim_df.loc[trial_nr, 'trial_type']
         stim_name = self.stim_df.loc[trial_nr, 'stim_name']
-        task_probe = self.stim_df.loc[trial_nr, 'task_prob']
+        task_probe = self.stim_df.loc[trial_nr, 'task_probe']
 
         trial = FLocTrial(
             session=self,
