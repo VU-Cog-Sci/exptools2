@@ -6,7 +6,6 @@ from psychopy import logging
 
 # TODO:
 # - add port_log (like dict(phase=code)) to trial init
-# - currently no way to add extra params to logfile per trial
 
 
 class Trial:
@@ -130,6 +129,7 @@ class Trial:
         if events:
             if 'q' in [ev[0] for ev in events]:  # specific key in settings?
                 self.session.close()
+                self.session.quit()
 
             for key, t in events:
 
