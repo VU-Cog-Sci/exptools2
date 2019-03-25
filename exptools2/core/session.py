@@ -61,6 +61,7 @@ class Session:
         self.current_trial = None
         self.global_log = pd.DataFrame(columns=['trial_nr', 'onset', 'event_type', 'phase', 'response', 'nr_frames'])
         self.nr_frames = 0  # keeps track of nr of nr of frame flips
+        self.first_trial = True
 
         # Initialize
         self.settings = self._load_settings()
@@ -137,7 +138,7 @@ class Session:
         args = self.settings['mri'].copy()
         args.pop('simulate')
         self.mri_trigger = self.settings['mri']['sync']
-        return SyncGenerator(**args)   
+        return SyncGenerator(**args)
 
     def start_experiment(self, wait_n_triggers=None):
         """ Logs the onset of the start of the experiment.

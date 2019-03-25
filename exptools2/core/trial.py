@@ -178,12 +178,14 @@ class Trial:
 
         # Because the first flip happens when the experiment starts,
         # we need to compensate for this during the first trial/phase
-        if self.session.nr_frames == 0:
+        if self.session.first_trial:
             # must be first trial/phase
             if self.timing == 'seconds':  # subtract duration of one frame
                 self.phase_durations[0] -= 1./self.session.actual_framerate * 1.1  # +10% to be sure
             else:  # if timing == 'frames', subtract one frame 
                 self.phase_durations[0] -= 1
+            
+            self.session.first_trial = False
 
         for phase_dur in self.phase_durations:  # loop over phase durations
             self.session.win.callOnFlip(self.log_phase_info)
