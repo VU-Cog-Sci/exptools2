@@ -222,7 +222,7 @@ class Session:
         self.global_log['onset_abs'] = self.global_log['onset'] + self.exp_start
 
         # Only non-responses have a duration
-        nonresp_idx = ~self.global_log.event_type.isin(['response', 'trigger'])
+        nonresp_idx = ~self.global_log.event_type.isin(['response', 'trigger', 'pulse'])
         last_phase_onset = self.global_log.loc[nonresp_idx, 'onset'].iloc[-1]
         dur_last_phase = self.exp_stop - last_phase_onset 
         durations = np.append(self.global_log.loc[nonresp_idx, 'onset'].diff().values[1:], dur_last_phase)
