@@ -141,7 +141,8 @@ class Session:
         self.mri_trigger = self.settings['mri']['sync']
         return SyncGenerator(**args)
 
-    def start_experiment(self, wait_n_triggers=None):
+    def start_experiment(self, wait_n_triggers=None,
+                         show_fix_during_dummies=True):
         """ Logs the onset of the start of the experiment.
         
         Parameters
@@ -152,6 +153,8 @@ class Session:
             'dummy' scans that send triggers to the stimulus-PC.
             Note: clock is still reset right after calling this
             method.
+        show_fix_during_dummies : bool
+            Whether to show a fixation cross during dummy scans.
         """
         self.exp_start = self.clock.getTime()
         self.clock.reset()  # resets global clock
@@ -165,6 +168,11 @@ class Session:
         if wait_n_triggers is not None:
             print(f'Waiting {wait_n_triggers} triggers before starting ...')
             n_triggers = 0
+            
+            if show_fix_during_dummies:
+                self.default_fix.draw()
+                self.win.flip()
+
             while n_triggers < wait_n_triggers:
                 waitKeys(keyList=[self.settings['mri'].get('sync', 't')])
                 n_triggers += 1

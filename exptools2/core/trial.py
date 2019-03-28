@@ -152,8 +152,9 @@ class Trial:
                 #self.trial_log['response_onset'][self.phase].append(t)
                 #self.trial_log['response_time'][self.phase].append(t - self.start_trial)
 
-            self.last_resp = key
-            self.last_resp_onset = t
+                if key != self.session.mri_trigger:
+                    self.last_resp = key
+                    self.last_resp_onset = t
 
     def load_next_trial(self, phase_dur):
         self.draw()  # draw this phase, then load
@@ -165,6 +166,7 @@ class Trial:
         except Exception as err:  # not quite happy about this try/except part ...
             logging.warn('Cannot create trial - probably at last one '
                             f'(trial {self.trial_nr})!')
+            raise(err)
 
         load_dur = self.session.clock.getTime() - load_start
 
