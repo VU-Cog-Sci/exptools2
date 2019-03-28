@@ -62,6 +62,7 @@ class Session:
         self.global_log = pd.DataFrame(columns=['trial_nr', 'onset', 'event_type', 'phase', 'response', 'nr_frames'])
         self.nr_frames = 0  # keeps track of nr of nr of frame flips
         self.first_trial = True
+        self.closed = False
 
         # Initialize
         self.settings = self._load_settings()
@@ -209,6 +210,10 @@ class Session:
     def close(self):
         """ 'Closes' experiment. Should always be called, even when
         experiment is quit manually (saves onsets to file). """
+
+        if self.closed:  # already closed!
+            return None
+
         self.win.callOnFlip(self._set_exp_stop)
         self.win.flip(clearBuffer=True)
         self.win.recordFrameIntervals = False
@@ -250,13 +255,14 @@ class Session:
             self.mri_simulator.stop()
 
         self.win.close()
+        self.closed = True
 
     def quit(self):
         """ Quits Python tread (and window if necessary). """
 
-        if not self.win._closed:
+        if not self.closed:
             self.close()
-
+        
         core.quit()
 
 
