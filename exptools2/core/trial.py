@@ -68,13 +68,11 @@ class Trial:
     def _check_params(self):
         """ Checks whether parameters/settings are valid. """
         if self.load_next_during_phase is not None:
-            if not callable(getattr(self.session, 'create_trial', None)):
-                msg = "Cannot load next trial if 'create_trial' is not defined in session!"
-                raise ValueError(msg)
 
             if self.timing == 'frames':
-                raise ValueError("Loading in next trial is only supported when "
-                                 "timing=='seconds'")
+                msg = ("Loading in next trial is only supported "
+                       "when timing=='seconds'")
+                raise ValueError(msg)
 
         TIMING_OPTS = ['seconds', 'frames']
         if self.timing not in TIMING_OPTS:
@@ -84,6 +82,14 @@ class Trial:
             if not all([isinstance(dur, int) for dur in self.phase_durations]):
                 raise ValueError("Durations should be integers when timing "
                                  "is set to 'frames'!")
+
+    def draw(self):
+        """ Should be implemented in child Class. """
+        raise NotImplementedError
+
+    def create_trial(self):
+        """ Should be implemented in child Class. """
+        raise NotImplementedError
 
     def log_phase_info(self):
         """ Method passed to win.callonFlip, such that the
