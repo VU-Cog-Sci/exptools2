@@ -1,5 +1,5 @@
-from exptools2.session import Session
-from exptools2.trial import Trial
+from exptools2.core import Session
+from exptools2.core import Trial
 from psychopy.visual import TextStim
 from exptools2.utils import save_experiment
 
@@ -19,10 +19,10 @@ class TestTrial(Trial):
 
 class TestSession(Session):
     """ Simple session with x trials. """
-    def __init__(self, output_str, settings_file=None, n_trials=10, eyetracker_on=False):
+    def __init__(self, output_str, settings_file=None, n_trials=10):
         """ Initializes TestSession object. """
         self.n_trials = n_trials
-        super().__init__(output_str, settings_file, eyetracker_on)
+        super().__init__(output_str, settings_file)
 
     def create_trials(self, durations=(.5, .5), timing='seconds'):
         self.trials = []
@@ -32,7 +32,8 @@ class TestSession(Session):
                           trial_nr=trial_nr,
                           phase_durations=durations,
                           txt='Trial %i' % trial_nr,
-                          verbose=False,
+                          parameters=dict(trial_type='even' if trial_nr % 2 == 0 else 'odd'),
+                          verbose=True,
                           timing=timing)
             )
 
@@ -46,9 +47,10 @@ class TestSession(Session):
 
 
 if __name__ == '__main__':
-    session = TestSession('sub-01', n_trials=5)
-    session.create_trials(durations=(.5, .5), timing='seconds')
-    #session.create_trials(durations=(30, 30), timing='frames')
-    session.run()
 
-    
+    session = TestSession('sub-01', n_trials=10)
+    session.create_trials(durations=(.1, .1), timing='seconds')
+    #session.create_trials(durations=(3, 3), timing='frames')
+    session.run()
+    #utils.save_experiment(session, 'sub-01', engine='joblib')
+    session.quit()

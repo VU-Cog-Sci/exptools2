@@ -79,6 +79,11 @@ opts = dict(
     packages=PACKAGES,
     package_data=PACKAGE_DATA,
     install_requires=REQUIRES,
+    entry_points={
+                'console_scripts': [
+                    'exptools2_fLoc = exptools2.experiments.fLoc.main:main_api',
+                    ]
+                }
 )
 
 
