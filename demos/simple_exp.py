@@ -1,3 +1,4 @@
+import os.path as op
 from exptools2.core import Session
 from exptools2.core import Trial
 from psychopy.visual import TextStim
@@ -19,10 +20,10 @@ class TestTrial(Trial):
 
 class TestSession(Session):
     """ Simple session with x trials. """
-    def __init__(self, output_str, settings_file=None, n_trials=10):
+    def __init__(self, output_str, output_dir=None, settings_file=None, n_trials=10):
         """ Initializes TestSession object. """
         self.n_trials = n_trials
-        super().__init__(output_str, settings_file)
+        super().__init__(output_str, output_dir=None, settings_file=settings_file)
 
     def create_trials(self, durations=(.5, .5), timing='seconds'):
         self.trials = []
@@ -48,9 +49,9 @@ class TestSession(Session):
 
 if __name__ == '__main__':
 
-    session = TestSession('sub-01', n_trials=10)
-    session.create_trials(durations=(.1, .1), timing='seconds')
+    settings = op.join(op.dirname(__file__), 'settings.yml')
+    session = TestSession('sub-01', n_trials=100, settings_file=settings)
+    session.create_trials(durations=(.25, .25), timing='seconds')
     #session.create_trials(durations=(3, 3), timing='frames')
     session.run()
-    #utils.save_experiment(session, 'sub-01', engine='joblib')
     session.quit()

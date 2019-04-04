@@ -223,7 +223,7 @@ class Session:
             return None
 
         self.win.callOnFlip(self._set_exp_stop)
-        self.win.flip(clearBuffer=True)
+        self.win.flip()
         self.win.recordFrameIntervals = False
 
         print(f"\nDuration experiment: {self.exp_stop:.3f}\n")
