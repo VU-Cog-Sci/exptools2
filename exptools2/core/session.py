@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from psychopy import core
-from psychopy.iohub import launchHubServer
 from psychopy.visual import Window, TextStim
 from psychopy.event import waitKeys, Mouse
 from psychopy.monitors import Monitor
@@ -272,63 +271,3 @@ class Session:
             self.close()
         
         core.quit()
-
-
-class EyeTrackerSession(Session):
-    """ EyetrackerSession class."""
-
-    def __init__(self, output_str, eyetracker_on=True, **kwargs):
-        """ Initializes EyetrackerSession class.
-        
-        parameters
-        ----------
-        output_str : str
-            Name (string) for output-files (e.g., 'sub-01_ses-post_run-1')
-        eyetracker_on : bool
-            Whether the eyetracker is actually on
-        kwargs : dict
-            Extra arguments to base Session class initialization
-
-        attributes
-        ----------
-        tracker : Eyetracker object
-            IOHub or Pylink Eyetracker object
-        """
-        super().__init__(output_str, **kwargs)
-        self.eyetracker_on=eyetracker_on
-
-    def init_eyetracker(self):
-        """ Initializes eyetracker.
-
-        After initialization, tracker object ("device" in iohub lingo)
-        can be accessed from self.tracker
-        """
-        if not self.eyetracker_on:
-            raise ValueError("Cannot initialize eyetracker if eyetracker_on=False!")
-
-        EYETRACKER_NAME = 'eyetracker.hw.sr_research.eyelink.EyeTracker'
-        self.iohub = launchHubServer(
-            psychopy_monitor_name=self.monitor.name,
-            **{EYETRACKER_NAME: {
-                'enable_interface_without_connection': False,
-            }}
-        )
-
-        self.tracker = self.iohub.devices.eyetracker
-
-    def start_recording_eyetracker(self):
-        self.tracker.setRecordingState(True)
-
-    def stop_recording_eyetracker(self):
-        self.tracker.setRecordingState(False)
-
-    def calibrate_eyetracker(self):
-
-        if self.tracker is None:
-            raise ValueError("Cannot calibrate tracker if it's not initialized yet!")
-
-        self.tracker.runSetupProcedure()
-
-    def close_tracker(self):
-        self.stop_recording_eyetracker()
-        self.iohub.quit()

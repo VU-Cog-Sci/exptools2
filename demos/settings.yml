@@ -23,6 +23,8 @@ mouse:
 
 eyetracker:
   model: eyelink
+  CNUM: 9
+  MIN_CALIB_FIX: 1000
 
 mri:
   simulate: False

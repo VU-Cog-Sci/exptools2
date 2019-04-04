@@ -21,12 +21,20 @@ mouse:
   visible: False
 
 eyetracker:
-  model: eyelink
+  model: eyelink  # not used actually
+  address: '100.1.1.1'
+  dot_size: 0.1  # in deg
+  calib_type: HV9  # [H3, HV3, HV5, HV9]
+  enable_auto_calib: True
+  auto_calib_pacing: 1000
+  pupil_size_data: diameter
+  sample_rate: 1000
+  eye: left  # no idea how to actually set this yet
 
 mri:
   simulate: False
   TR: 2.0  # seconds between volume acquisitions
-  TA: 2.0  # seconds to acquire one volume
+  TA: 2.0  # seconds to acquire one slice (?)
   volumes: 10  # number of 3D volumes to obtain in a given scanning run
   sync: t  # character used as flag for sync timing, default=‘5’
   skip: 0  # how many frames to silently omit initially during T1 stabilization, no sync pulse.
