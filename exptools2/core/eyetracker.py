@@ -14,11 +14,11 @@ from .trial import Trial
 
 
 class PylinkEyetrackerSession(Session):
-
+    """ Custom PylinkEyetrackerSession class. """
     def __init__(self, output_str, eyetracker_on=True, **kwargs):
-        """ Initializes EyetrackerSession class.
+        """ Initializes PylinkEyetrackerSession class.
         
-        parameters
+        Parameters
         ----------
         output_str : str
             Name (string) for output-files (e.g., 'sub-01_ses-post_run-1')
@@ -27,7 +27,7 @@ class PylinkEyetrackerSession(Session):
         kwargs : dict
             Extra arguments to base Session class initialization
 
-        attributes
+        Attributes
         ----------
         tracker : Eyelink
             Pylink 'Eyelink' object
@@ -46,9 +46,10 @@ class PylinkEyetrackerSession(Session):
         if not self.eyetracker_on:
             return None
 
-        tracker = pylink.EyeLink(trackeraddress=self.et_settings.get('address'))
+        tracker = pylink.EyeLink(self.et_settings.get('address'))
         pylink.flushGetkeyQueue()
         tracker.setOfflineMode()
+        tracker.sendCommand('set_idle_mode')  # why?
 
         self.edf_name = datetime.now().strftime('%H_%M_%S.edf')
         tracker.openDataFile(self.edf_name)
@@ -56,49 +57,13 @@ class PylinkEyetrackerSession(Session):
 
     def _set_options_tracker(self):
         """ Sets a bunch of options . """
-        # Set content of edf file (@Tomas: what are sensible defaults?)
-        cmds = [
-            'file_event_filter = LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON,INPUT',
-            'link_event_filter = LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON',
-            'link_sample_data = LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS,HTARGET',
-            'file_sample_data = LEFT,RIGHT,GAZE,AREA,GAZERES,STATUS,HTARGET,INPUT',
-            f"sample_rate = {self.et_settings['sample_rate']}",
-            'set_idle_mode',
-        ]
 
-        #self.sendCommand("file_event_filter = LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON")
-		#self.sendCommand("file_sample_data  = LEFT,RIGHT,GAZE,AREA,GAZERES,STATUS,HREF,PUPIL")
-		#self.sendCommand("link_event_filter = LEFT,RIGHT,FIXATION,FIXUPDATE,SACCADE,BLINK,BUTTON")
-		#self.sendCommand("link_sample_data  = LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS")
-
-        for cmd in cmds:
-            self.tracker.sendCommand(cmd)
-            core.wait(0.05)  # give the tracker some leeway
-		
-        self.tracker.setCalibrationType(self.et_settings.get('calib_type'))
-        self.tracker.setAutoCalibrationPacing(self.et_settings.get('auto_calib_pacing'))
-        
-        if self.et_settings.get('enable_auto_calib'):
-            self.tracker.enableAutoCalibration()
-        
-        if self.et_settings.get('pupil_size_data') == 'diameter':
-            self.tracker.setPupilSizeDiameter('YES')
-        else:
-            self.tracker.setPupilSizeDiameter('NO')
-
-        self.tracker.sendCommand(f"active_eye = {self.et_settings.get('eye').upper()}")
-
-        # TODO: allow settings
-        self.tracker.sendCommand("enable_search_limits=YES")
-        self.tracker.sendCommand("track_search_limits=YES")
-        self.tracker.sendCommand("autothreshold_click=YES")
-        self.tracker.sendCommand("autothreshold_repeat=YES")
-        self.tracker.sendCommand("enable_camera_position_detect=YES")
-
-        # Probably some more stuff ... 
+        for opt_name, opt_val in self.et_settings['options']:
+            self.tracker.sendCommand(f'{opt_name} = {opt_val}')
+            core.wait(0.05)  # give it some time
 
     def _create_display(self):
-        """ Creates display upon initialization . """
+        """ Creates a custom display upon initialization ."""
         display = PsychopyCustomDisplay(
             self.tracker, self.win, self.settings,
         )
@@ -113,14 +78,17 @@ class PylinkEyetrackerSession(Session):
         self.tracker.doTrackerSetup(*self.win.size)
 
     def start_recording_eyetracker(self):
-        """ Starts recording data. """
+        """ Starts recording data. This should be called 
+        *before* calling self.start_experiment()
+        """
         if self.eyetracker_on:
-            # TODO: what do those params mean?
             self.tracker.startRecording(1, 1, 1, 1)
+            core.wait(0.05)  # start recording takes a while
 
     def stop_recording_eyetracker(self):
         """ Stops recording data. """ 
         if self.eyetracker_on:
+            core.wait(0.15)  # wait a bit
             self.tracker.stopRecording()
 
     def close(self):
@@ -128,7 +96,7 @@ class PylinkEyetrackerSession(Session):
         super().close()
 
         if self.eyetracker_on:
-            self.tracker.stopRecording()
+            self.stop_recording_eyetracker()
             self.tracker.setOfflineMode()
             core.wait(.5)
             f_out = op.join(self.output_dir, self.output_str + '.edf')
@@ -214,6 +182,9 @@ class PsychopyCustomDisplay(pylink.EyeLinkCustomDisplay):
     go to him.
     """
     def __init__(self, tracker, win, settings):
+        """ Initializes PsychopyCustomDisplay object.
+
+        """
         super().__init__()
         self.tracker = tracker
         self.win = win

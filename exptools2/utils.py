@@ -1,12 +1,5 @@
 import pickle
 import joblib
-import pylink
-import numpy as np
-from psychopy.sound import Sound
-from psychopy import core
-from psychopy import event
-from psychopy.visual import Window, TextStim, Circle
-from psychopy.misc import deg2pix
 
 
 def save_experiment(session, output_str, engine='pickle'):

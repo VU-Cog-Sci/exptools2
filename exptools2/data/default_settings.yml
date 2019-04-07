@@ -21,15 +21,30 @@ mouse:
   visible: False
 
 eyetracker:
-  model: eyelink  # not used actually
   address: '100.1.1.1'
   dot_size: 0.1  # in deg
-  calib_type: HV9  # [H3, HV3, HV5, HV9]
-  enable_auto_calib: True
-  auto_calib_pacing: 1000
-  pupil_size_data: diameter
-  sample_rate: 1000
-  eye: left  # no idea how to actually set this yet
+  options:
+    active_eye: left  # [right]
+    binocular_enabled: NO  # [YES]
+    heuristic_filter: 2  # [0, OFF, 1, ON]
+    pupil_size_diameter: YES  # [NO]
+    simulate_head_camera: NO  # [YES]
+    #simulation_screen_distance
+    file_event_filter: 'LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON,INPUT'
+    link_event_filter: 'LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON'
+    link_sample_data: 'LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS,HTARGET'
+    file_sample_data: LEFT,RIGHT,GAZE,AREA,GAZERES,STATUS,HTARGET,INPUT'
+    calibration_type: HV9  # [H3, HV3, HV5, HV9]
+    x_gaze_constraint: AUTO
+    y_gaze_constraint: AUTO
+    enable_automatic_calibration: YES  # [NO]
+    automatic_calibration_pacing: 1000
+    enable_search_limits: YES
+    track_search_limits: YES
+    autothreshold_click: YES
+    autothreshold_repeat: YES
+    enable_camera_position_detect: YES
+    sample_rate: 1000
 
 mri:
   simulate: False
