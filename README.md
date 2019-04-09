@@ -77,7 +77,15 @@ window:
 If you specify a parameter in your custom settings-file that is *also* included in the default settings-file (such as `size` in the `window` top-level item), your custom parameter will overwrite the default. Also, any parameter that is not explicitly set in your settings-file will inherit the default from the default settings-file. 
 
 #### Eyetracker settings
-Unlike the other top-level items in settings-files, parameters under the `eyetracker` item do not specifically refer to the arguments of a particular Psychopy class. Instead, it contains three "main" parameters: `address`, referring to the Eyelink eyetracker IP, `dot_size`, referring to the size of dots during calibration in visual degree angle, and most importantly `options`, which contains lower-level key-value settings. These settings under `options` correspond to Eyelink specific settings (which can be found in the [Eyelink Programmer's Guide](http://download.sr-support.com/dispdoc/)).
+Unlike the other top-level items in settings-files, parameters under the `eyetracker` item do not specifically refer to the arguments of a particular Psychopy class. Instead, it contains three "main" parameters: `address`, referring to the Eyelink eyetracker IP, `dot_size`, referring to the size of dots during calibration in visual degree angle, and most importantly `options`, which contains lower-level key-value settings. These settings under `options` correspond to Eyelink specific settings (which can be found in the [Eyelink Programmer's Guide](http://download.sr-support.com/dispdoc/)). For example, to set the `calibration_type` (default: `HV9`, i.e., 9-point calibration) to `HV3` (i.e., 3-point calibration), you can include the following in your settings-file:
+
+```yaml
+eyetracker:
+  address: '100.1.1.1'
+  dot_size: 0.1  # in deg
+  options:
+    calibration_type: HV9
+```
 
 ### The `Trial` class
 
