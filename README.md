@@ -246,18 +246,15 @@ class StroopSession(Session):
         
     def create_trials(self):
         """ Creates trials (ideally before running your session!) """
-        for i in range(self.n_trials):
-            if i % 2 == 0:
-                condition = 'congruent'
-            else:
-                condition = 'incongruent'
-        
+        conditions = ['congruent' if i % 2 == 0 else 'incongruent'
+                      for i in range(self.n_trials)]
+        random.shuffle(conditions)
+
+        for i in range(self.n_trials):        
             trial = StroopTrial(session=self, trial_nr=i, condition=condition)
             # ^It actually needs more arguments than just these two,
             # which we'll explain later
-            self.trials.append(trial)
-        
-        random.shuffle(self.n_trials)
+            self.trials.append(trial)        
 ```
 
 #### The `phase_durations` and `timing` arguments
@@ -275,28 +272,26 @@ class StroopSession(Session):
 
     def __init__(self, output_str, output_dir, settings_file, n_trials):
         super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
-        self.n_trials = n_trails  # just an example argument
+        self.n_trials = n_trials  # just an example argument
         self.trials = []  # will be filled with Trials later
         
     def create_trials(self):
         """ Creates trials (ideally before running your session!) """
+        conditions = ['congruent' if i % 2 == 0 else 'incongruent'
+                      for i in range(self.n_trials)]
+        random.shuffle(conditions)
+
         for i in range(self.n_trials):
-            if i % 2 == 0:
-                condition = 'congruent'
-            else:
-                condition = 'incongruent'
-        
             trial = StroopTrial(
                 session=self,
                 trial_nr=i,
                 phase_durations=(2, 1),
                 timing='seconds',
                 phase_names=('word', 'fix'),
-                parameters={'condition': condition}
+                parameters={'condition': conditions[i]},
+                condition=conditions[i]
             )
             self.trials.append(trial)
-            
-        random.shuffle(self.n_trials)
 ```
 
 #### The `verbose` argument
@@ -326,8 +321,7 @@ class SessionWithManyImages(Session):
 
 ### Overview: a complete experiment
 
-```python
-import random
+```pythonimport random
 from exptools2.core import Trial, Session
 from psychopy.visual import TextStim, Circle
 
@@ -339,20 +333,21 @@ class StroopTrial(Trial):
                  verbose, condition='congruent'):
         """ Initializes a StroopTrial object. """
         super().__init__(session, trial_nr, phase_durations, phase_names,
-                         parameters, timing, verbose, load_next_during_phase)
+                         parameters, timing, load_next_during_phase, verbose)
         self.condition = condition
         self.fixation_dot = Circle(self.session.win, radius=0.1, edges=100)
         
         if self.condition == 'congruent':
-            self.word = TextStim(self.session.win, text='red', color=(255, 0, 0))  # red!
+            self.word = TextStim(self.session.win, text='red', color=(1, 0, 0))  # red!
         else:
-            self.word = TextStim(self.session.win, text='red', color=(0, 255, 0))  # green!
+            self.word = TextStim(self.session.win, text='red', color=(0, 1, 0))  # green!
             
     def draw(self):
         if self.phase == 0:  # Python starts counting from 0, and so should you
-            self.fixation_dot.draw()
-        else:  # assuming that there are only 2 phases
             self.word.draw()
+        else:  # assuming that there are only 2 phases
+            self.fixation_dot.draw()
+
 
 class StroopSession(Session):
 
@@ -363,11 +358,11 @@ class StroopSession(Session):
         
     def create_trials(self):
         """ Creates trials (ideally before running your session!) """
+        conditions = ['congruent' if i % 2 == 0 else 'incongruent'
+                      for i in range(self.n_trials)]
+        random.shuffle(conditions)
+
         for i in range(self.n_trials):
-            if i % 2 == 0:
-                condition = 'congruent'
-            else:
-                condition = 'incongruent'
         
             trial = StroopTrial(
                 session=self,
@@ -375,12 +370,13 @@ class StroopSession(Session):
                 phase_durations=(2, 1),
                 timing='seconds',
                 phase_names=('word', 'fix'),
-                parameters={'condition': condition}
+                parameters={'condition': conditions[i]},
+                load_next_during_phase=None,
+                verbose=True,
+                condition=conditions[i]
             )
             self.trials.append(trial)
             
-        random.shuffle(self.n_trials)
-        
     def run(self):
         self.create_trials()
         self.start_experiment()
@@ -392,8 +388,7 @@ class StroopSession(Session):
 
 
 if __name__ == '__main__':
-    settings_f = '~/settings.yml'
-    my_sess = StroopSession('sub-01', '~/logs', settings_f, n_trials=10)
+    my_sess = StroopSession('sub-01', '~/logs', '/Users/lukas/settings.yml', n_trials=10)
     my_sess.run()
 ```
 
