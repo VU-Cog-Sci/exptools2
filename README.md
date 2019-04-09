@@ -150,17 +150,53 @@ class StroopTrial(Trial):
     pass 
 ```
 
-Now, we of course want to tailor this `StroopTrial` class to our experiment. This most likely starts with defining the stimuli that you want to show during your trial. In a Stroop-task, this usually is a (colored) word and (afterwards) a fixation cross/dot. To reduce the chance of timing issues, we recommend initializing these stimuli "as soon as possible", for example, during initialization (i.e., within the `__init__()` method). Let's do that for our `StroopTrial` class. We'll build a very simple version of the Stroop-task, in which trials can be congruent (the word "red" in the color red) or incongruent (the word "red" in the color green). (Usually, the Stroop-task of course contains more words/colors.) 
+Now, we of course want to tailor this `StroopTrial` class to our experiment. This most likely starts with defining the stimuli that you want to show during your trial; these stimuli can be (or actually, should be) defined using Psychopy objects (such as `TextStim`, `Circle`, `ImageStim`, `SoundStim`, etc.).
+
+In a Stroop-task, this usually is a (colored) word and (afterwards) a fixation cross/dot. To reduce the chance of timing issues, we recommend initializing these stimuli "as soon as possible", for example, during initialization (i.e., within the `__init__()` method). Let's do that for our `StroopTrial` class. We'll build a very simple version of the Stroop-task, in which trials can be congruent (the word "red" in the color red) or incongruent (the word "red" in the color green). (Usually, the Stroop-task of course contains more words/colors.) As such, per trial, we have to define two stimuli: a fixation dot and a (colored) text-stimulus. (Ignore the initialization-parameters for now, which will be explained later.)
 
 ```python
+from psychopy.visual import Circle, TextStim
 
 class StroopTrial(Trial):
     
-    def __init__(self, condition='congruent'):
-        super().__init__()
-        self.condition = condition
+    def __init__(self, session, trial_nr, phase_durations, phase_names,
+                 parameters, timing, load_next_during_phase, 
+                 verbose, condition='congruent'):
+        """ Initializes a StroopTrial object. 
         
-
+        Parameters
+        ----------
+        session : exptools Session object
+            A Session object (needed for metadata)
+        trial_nr: int
+            Trial nr of trial
+        phase_durations : array-like
+            List/tuple/array with phase durations
+        phase_names : array-like
+            List/tuple/array with names for phases (only for logging),
+            optional (if None, all are named 'stim')
+        parameters : dict
+            Dict of parameters that needs to be added to the log of this trial
+        timing : str
+            The "units" of the phase durations. Default is 'seconds', where we
+            assume the phase-durations are in seconds. The other option is
+            'frames', where the phase-"duration" refers to the number of frames.
+        load_next_during_phase : int (or None)
+            If not None, the next trial will be loaded during this phase
+        verbose : bool
+            Whether to print extra output (mostly timing info)
+        condition : str
+            Condition of the Stroop trial (either 'congruent' or 'incongruent')
+        """
+        super().__init__(session, trial_nr, phase_durations, phase_names,
+                         parameters, timing, verbose, load_next_during_phase)
+        self.condition = condition
+        self.fixation_dot = Circle(self.session.win, radius=0.1, edges=100)
+        
+        if self.condition == 'congruent':
+            self.word = TextStim(self.session.win, text='red', color=(255, 0, 0))  # red!
+        else:
+            self.word = TextStim(self.session.win, text='red', color=(0, 255, 0))  # green!
 ```
 
 
