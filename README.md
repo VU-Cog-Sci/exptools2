@@ -380,15 +380,26 @@ class StroopSession(Session):
             self.trials.append(trial)
             
         random.shuffle(self.n_trials)
+        
+    def run(self):
+        self.create_trials()
+        self.start_experiment()
+        
+        for trial in self.trials:
+            trial.run()
+     
+        self.close()
+
+
+if __name__ == '__main__':
+    settings_f = '~/settings.yml'
+    my_sess = StroopSession('sub-01', '~/logs', settings_f, n_trials=10)
+    my_sess.run()
 ```
 
 ### The `PylinkEyetrackerSession` class
-...
+TBD
 
-## Tips and tricks / recommendations
-- something about frames vs. seconds
-- load_during_next
-will contain 
 ## Installation instructions
 The package is not yet pip-installable. To install it, clone the repository (`git clone https://github.com/VU-Cog-Sci/exptools2.git`) and install the package (`python setup.py install`). The package assumes that the following dependencies are installed:
 
