@@ -136,10 +136,26 @@ if __name__ == '__main__':
     my_sess.run()
 ```
 
+After your session finished running, there should be an (BIDS-formatted) events-file in the specified `output_dir` (with the format `{output_str}_events.tsv`) along with some extra information (such as the Psychopy specific logfile and an image with the frame-intervals, which gives information about potential stimulus timing issues). 
+
+Now, let's discuss these `Trial` objects that we discussed earlier!
+
 ### The `Trial` class
+Next to the base `Session` class, `exptools2` also includes a "template" for trials with the (surprise surprise) `Trial` class. This template again contains some boilerplate code that takes care of accurately timing (and logging) stimuli and responses and should be, just like the `Session` class, *not* be directly used in your experiment. Instead, you should create a new class specific to your experiment that inherits from the base `Trial` class. Let's do this for our Stroop-experiment (this may be implemented in the same file, e.g. `stroop.py`, as your custom session class):
+
+```python
+from exptools2.core import Trial
+
+class StroopTrial(Trial):
+    pass 
+```
 
 ### The `PylinkEyetrackerSession` class
 ...
+
+## Tips and tricks / recommendations
+- something about frames vs. seconds
+- load_during_next
 
 ## Installation instructions
 The package is not yet pip-installable. To install it, clone the repository (`git clone https://github.com/VU-Cog-Sci/exptools2.git`) and install the package (`python setup.py install`). The package assumes that the following dependencies are installed:
