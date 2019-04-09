@@ -227,6 +227,38 @@ class StroopTrial(Trial):
             self.word.draw()
 ```
 
+That's it! Of course, your `draw` method may be much more complex depending on the number of stimuli/phases of your trials. You won't actually call the `draw` method yourself; this happens in the `run` method defined in the base `Trial` class. Basically, this method loops over your custom `draw` method for a prespecific time period and advances the phase (i.e., `self.phase`) when the time period has finished. But how does `exptools2` know how long to run a particular phase? This is were the arguments during initialization of your `Trial` object come in! We'll discuss these parameters one by one, because they're quite important.
+
+#### The `session` argument
+In order to run your trial correctly, the `Trial` object should now some settings from the session, such as monitor settings, the session timer, etc. To allow access to this information about the session, we simply add the `Session` object to the list of expected parameters of trials! This may be a bit counterintuitive, because we told you to create trials *within* the session -- so how should you pass the session object it*self* to your (custom) `Trial` class upon initialization? Well, you probably guessed it from the phrasing: we can simply pass `self`!
+
+Let's take a look at how that would look like. Remember, we recommended creating your trials upfront (e.g., in a method called `create_trials` within your custom session object). As such this method could look something like the following (note that we also add the `trial_nr` here!):
+
+```python
+class StroopSession(Session):
+
+    def __init__(self, output_str, output_dir, settings_file, n_trials):
+        super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
+        self.n_trials = n_trails  # just an example argument
+        self.trials = []  # will be filled with Trials later
+        
+    def create_trials(self):
+        """ Creates trials (ideally before running your session!) """
+        for i in range(self.n_trials):
+            trial = StroopTrial(session=self, trial_nr=i)
+            # ^It actually needs more arguments than just these two,
+            # which we'll explain later
+            self.trials.append(trial)
+```
+
+#### The `phase_durations` and `timing` arguments
+The `phase_durations` arguments does what it suggest: it defines how long each phase in your trial should last. This should be a list-like object, but we recommend using a tuple for this. The length of your `phase_durations` tuple should of course match the number of phases in your trial. If you use `phase_durations=(1, 2)`, but you have not two, but three phases, your trial will never draw the stimuli of phase 3 (i.e., self.phase == 2; Python is 0-based)!
+
+But what do this `1` and `2` refer to in the `phase_durations` argument? This depends on the `timing` argument! The `timing` argument can take two values: either `'seconds'` (the default) or `'frames'`. So, settings `phase_durations` to `(1, 2)` and `timing` to `'seconds'` will show phase zero for 1 second and phase one for two seconds. If you would set `timing` to `'frames'`, however, it will show phase zero for 1 frame and phase one to 2 frames -- the exact duration in seconds, here, thus depends on the specific framerate of your monitor! Technically, the `'frames'` method should be more accurate in terms of duration, *assuming that you don't drop any frames during your experiment*. Use this method if timing/stimulus onsets are *absolutely* crucial (like in EEG/MEG experiments or subliminal/unconscious/masking tasks).
+
+#### The `phase_names` and `parameters` arguments
+The `phase_names` and `parameters` arguments have to do with logging your trial-information. They are optional, but serve to make your logfile more information/more complete.
+
 
 ### The `PylinkEyetrackerSession` class
 ...
