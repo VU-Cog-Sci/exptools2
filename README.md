@@ -235,6 +235,8 @@ In order to run your trial correctly, the `Trial` object should now some setting
 Let's take a look at how that would look like. Remember, we recommended creating your trials upfront (e.g., in a method called `create_trials` within your custom session object). As such this method could look something like the following (note that we also add the `trial_nr` here!):
 
 ```python
+import random
+
 class StroopSession(Session):
 
     def __init__(self, output_str, output_dir, settings_file, n_trials):
@@ -245,10 +247,17 @@ class StroopSession(Session):
     def create_trials(self):
         """ Creates trials (ideally before running your session!) """
         for i in range(self.n_trials):
-            trial = StroopTrial(session=self, trial_nr=i)
+            if i % 2 == 0:
+                condition = 'congruent'
+            else:
+                condition = 'incongruent'
+        
+            trial = StroopTrial(session=self, trial_nr=i, condition=condition)
             # ^It actually needs more arguments than just these two,
             # which we'll explain later
             self.trials.append(trial)
+        
+        random.shuffle(self.n_trials)
 ```
 
 #### The `phase_durations` and `timing` arguments
@@ -259,8 +268,61 @@ But what do this `1` and `2` refer to in the `phase_durations` argument? This de
 #### The `phase_names` and `parameters` arguments
 The `phase_names` and `parameters` arguments have to do with logging your trial-information. They are optional, but serve to make your logfile more information/more complete. Basically, `exptools` will log each phase of every trial separately. So every phase will be logged as a separate row in your logfile (in addition to responses by the participant, which will also get their own row). By default, the logfile contains a column called `event_type`, which will by default be `"stim"` for every phase. But if you want to give every phase a separate name, you can assign a tuple (or list) of strings to `phase_names`, e.g., `phase_names=('word', 'fix')` for our `StroopTrial`. 
 
-The `parameters` argument servers a similar function. The argument, which should be a dictionary, allows you to add extra information to your logfile for that trial. For our `StroopTrial`, this could for example be the `condition` (i.e., either `"congruent"` or `"incongruent"`). 
+The `parameters` argument servers a similar function. The argument, which should be a dictionary, allows you to add extra information to your logfile for that trial. For our `StroopTrial`, this could for example be the `condition` (i.e., either `"congruent"` or `"incongruent"`):
 
+```python
+class StroopSession(Session):
+
+    def __init__(self, output_str, output_dir, settings_file, n_trials):
+        super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
+        self.n_trials = n_trails  # just an example argument
+        self.trials = []  # will be filled with Trials later
+        
+    def create_trials(self):
+        """ Creates trials (ideally before running your session!) """
+        for i in range(self.n_trials):
+            if i % 2 == 0:
+                condition = 'congruent'
+            else:
+                condition = 'incongruent'
+        
+            trial = StroopTrial(
+                session=self,
+                trial_nr=i,
+                phase_durations=(2, 1),
+                timing='seconds',
+                phase_names=('word, 'fix'),
+                parameters={'condition': condition}
+            )
+            self.trials.append(trial)
+            
+        random.shuffle(self.n_trials)
+```
+
+#### The `verbose` argument
+Setting the `verbose` argument to `True` prints a bunch of stuff to the terminal while running your experiment (such as timing/onset of phases/trials) which may be nice during testing/debugging your experiment. As printing to `stdout` takes non-trivial amount of time, set this parameter to `False` when you're running your experiment for real.
+
+### The `load_during_next` argument (ADVANCED)
+This option (default `None`) is quite "advanced". It allows you to specify a particular phase during which `exptools2` should load the next trial. This option is useful when you don't want to initialize all trials before running your trial-loop, for example when this would take very long time (e.g., when loading thousands of images in a rapid visual processing experiment). When using this method, your session class should have a method called `create_trial` with a single argument reflecting the index of the trial that should be loaded. You are responsible of making sure that, given a particular trial-index, the correct trial will be loaded. To "load" a trial, you could set it to an attribute of your session, e.g., `current_trial`:
+
+```python
+
+class SessionWithManyImages(Session):
+
+    def create_trial(self, trial_nr):
+        trial = YourTrials(
+            session=session,
+            trial_nr, trial_nr,
+            phase_durations=(1, 1),
+            load_during_next=1  # load next trial during phase 1
+        )
+        self.current_trial = trial
+        
+    def run(self):
+        self.create_trial(trial_nr=0)  # set first trial
+        for i in range(10):  # assuming that there are 10 trials
+            self.current_trial.run()
+```
 
 ### The `PylinkEyetrackerSession` class
 ...
