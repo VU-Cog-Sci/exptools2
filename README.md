@@ -38,7 +38,7 @@ class StroopSession(Session):
             Number of trials to present (a custom parameter for this class)
         """
         super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
-        self.n_trials = n_trails  # just an example argument
+        self.n_trials = n_trials  # just an example argument
 ```
 
 Note that we're still calling the parent's `__init__` method (the `super().__init__()` call), because this is executing the boilerplate code that is needed to setup any `Session`! Note that the base `Session` class is initialized with three arguments: `output_str`, `output_dir`, and `settings_file`, of which only `output_str` is mandatory. Don't forget to add these arguments to the `__init__` method of your custom class! After calling the `super().__init__()` function, you may add whatever you like, such as binding the `n_trials` variable to `self`.
@@ -100,7 +100,7 @@ class StroopSession(Session):
 
     def __init__(self, output_str, output_dir, settings_file, n_trials):
         super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
-        self.n_trials = n_trails  # just an example argument
+        self.n_trials = n_trials  # just an example argument
         self.trials = []  # will be filled with Trials later
         
     def create_trials(self):
@@ -291,7 +291,7 @@ class StroopSession(Session):
                 trial_nr=i,
                 phase_durations=(2, 1),
                 timing='seconds',
-                phase_names=('word, 'fix'),
+                phase_names=('word', 'fix'),
                 parameters={'condition': condition}
             )
             self.trials.append(trial)
@@ -358,7 +358,7 @@ class StroopSession(Session):
 
     def __init__(self, output_str, output_dir, settings_file, n_trials):
         super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
-        self.n_trials = n_trails  # just an example argument
+        self.n_trials = n_trials  # just an example argument
         self.trials = []  # will be filled with Trials later
         
     def create_trials(self):
@@ -374,7 +374,7 @@ class StroopSession(Session):
                 trial_nr=i,
                 phase_durations=(2, 1),
                 timing='seconds',
-                phase_names=('word, 'fix'),
+                phase_names=('word', 'fix'),
                 parameters={'condition': condition}
             )
             self.trials.append(trial)
