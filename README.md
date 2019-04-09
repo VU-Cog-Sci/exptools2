@@ -199,6 +199,34 @@ class StroopTrial(Trial):
             self.word = TextStim(self.session.win, text='red', color=(0, 255, 0))  # green!
 ```
 
+Now, after initialization of a `StroopTrial` object, it has the attributes `fixation_dot` and `word` which correspond to the stimuli that we want to show during this trial. Again, the reason we want to define our stimuli during initialization (as opposed to during "runtime") is that it takes a little bit of time to create these stimuli, which may negatively impact the timing/duration of your trials. 
+
+Now, before explaining the class arguments (such as `session`, `trial_nr`, `phase_durations`, etc.), let's discuss the only thing that is missing from our custom `StroopTrial` class: the `draw` method. This method defines what happens (and when this happens) during our trial. You *always* need to define this method in your custom trials (otherwise `exptools2`/Psychopy does not know what to do with your stimuli!). In this method is where the "phases" come in. As said, we assume that trials contain (one or more) phases, in which different things need to happen. Therefore, the structure of any `draw` method is something along the lines of: "if we're in phase 0, then draw this stimulus, elif we're in phase 1, then draw this stimulus, etc.". So, for our Stroop-task, our method could look something like this:
+
+```python
+class StroopTrial(Trial):
+    
+    def __init__(self, session, trial_nr, phase_durations, phase_names,
+                 parameters, timing, load_next_during_phase, 
+                 verbose, condition='congruent'):
+        """ Initializes a StroopTrial object. """
+        super().__init__(session, trial_nr, phase_durations, phase_names,
+                         parameters, timing, verbose, load_next_during_phase)
+        self.condition = condition
+        self.fixation_dot = Circle(self.session.win, radius=0.1, edges=100)
+        
+        if self.condition == 'congruent':
+            self.word = TextStim(self.session.win, text='red', color=(255, 0, 0))  # red!
+        else:
+            self.word = TextStim(self.session.win, text='red', color=(0, 255, 0))  # green!
+            
+    def draw(self):
+        if self.phase == 0:  # Python starts counting from 0, and so should you
+            self.fixation_dot.draw()
+        else:  # assuming that there are only 2 phases
+            self.word.draw()
+```
+
 
 ### The `PylinkEyetrackerSession` class
 ...
