@@ -5,7 +5,10 @@ The `exptools` Python package provides a way to easily and quickly create (psych
 The package assumes that your experiment (or *session*) consists of a predetermined number of *trials*, which may in turn consist of a number of *phases*. For example, in a Stroop-experiment, a session may consist of 100 trials, which consist of two phases: a phase in which the stimulus (usually the word for a color, like "red", in a particular color) is shown, and another phase (the "interstimulus interval", ISI) in which a fixation dot is shown. Usually, you want your trials, and their phases, to have a predetermined onset and duration. This is especially relevant in studies in which concurrent fMRI, EEG/MEG, or eye gaze/pupil size is recorded. In `exptools2`, dedicated classes for functionality related to your session (the `Session` class) and your trials (the `Trial` class) are provided. Below, we explain these two classes in more detail.
 
 ### The `Session` class
-In the `core` module of `exptools`, the `Session` class is defined. This class represents a "template" for experimental sessions, which contains functionality/boilerplate code for creating a (Psychopy) window, stimulus/response logging, among other things. The base `Session` class is not meant to be used *directly*; instead, if you want to use its functionality in your own experiment, you should create your own class that inherits from the base `Session` class. For example, suppose that we want to implement a Stroop-experiment (we'll use this example throughout the docs). We can create a custom subclass based on `Session` as follows:
+In the `core` module of `exptools`, the `Session` class is defined. This class represents a "template" for experimental sessions, which contains functionality/boilerplate code for creating a (Psychopy) window, stimulus/response logging, among other things.
+
+#### Initializing and inheriting from the base `Session` class
+The base `Session` class is not meant to be used *directly*; instead, if you want to use its functionality in your own experiment, you should create your own class that inherits from the base `Session` class. For example, suppose that we want to implement a Stroop-experiment (we'll use this example throughout the docs). We can create a custom subclass based on `Session` as follows:
 
 ```python
 from exptools2.core import Session
@@ -39,6 +42,8 @@ class StroopSession(Session):
 ```
 
 Note that we're still calling the parent's `__init__` method (the `super().__init__()` call), because this is executing the boilerplate code that is needed to setup any `Session`! Note that the base `Session` class is initialized with three arguments: `output_str`, `output_dir`, and `settings_file`, of which only `output_str` is mandatory. Don't forget to add these arguments to the `__init__` method of your custom class! After calling the `super().__init__()` function, you may add whatever you like, such as binding the `n_trials` variable to `self`.
+
+Now, before we explain the other important aspects of (custom) `Session` objects, we need to digress slightly and talk about the settings-file.
 
 #### The settings-file
 An important part of `exptools2` is the settings-file, which is needed by the `Session` class (and thus every custom session class which inherits from `Session`). The package contains a default settings-file (in `data/default_settings.yml`), which is used when you do not provide a custom settings-file to the session object during initialization. This is fine for testing your experiment, but for your "real" experiment, you should provide your own (custom) settings-file that is specific to your experiment. Your custom settings-file does not have to contain *all* possible settings; those settings that are not listed in your custom settings-file will be "inherited" from the default-settings file (which contain sensible defaults). 
@@ -85,6 +90,50 @@ eyetracker:
   dot_size: 0.1  # in deg
   options:
     calibration_type: HV9
+```
+
+### Preparing, running, and closing your session
+As outlined before, any session should contain a (predefined) number of trials. In `exptools`, we recommend that you create your trials, which are operationalized as `Trial` objects from the `exptools2`-specific `Trial` class, *before* you run your session (we'll explain how to do this later). Then, once you have created your trials and stored this, e.g., in an attributed called `trials`, you can `start` your experiment, loop over your trials (i.e., `run` them one by one), and finally `close` your session. Below, we outline how our example `GstroopSession` may look like:
+
+```python
+class StroopSession(Session):
+
+    def __init__(self, output_str, output_dir, settings_file, n_trials):
+        super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
+        self.n_trials = n_trails  # just an example argument
+        self.trials = []  # will be filled with Trials later
+        
+    def create_trials(self):
+        """ Creates trials (ideally before running your session!) """
+        for i in range(self.n_trials):
+            self.trials.append(<<<your trial object>>>)
+    
+    def run(self):
+        """ Loops over trials and runs them! """
+        
+        self.create_trials()  # create them *before* running!
+        self.start_experiment()
+        
+        for trail in self.trials:
+            trial.run()
+            
+        self.close()
+```
+
+As you can see above, custom sessions should do three things:
+- create trials *before* running your session (e.g., in a method called `create_trials`, but you may call/implement this any way you like);
+- call `self.start_experiment()` whenever you want to start running your trials (this method sets the timer which keeps track of trial/phase onsets);
+- loop over trials and run them (using the `run` method of `Trial` objects, which are explained in the next section);
+- call `self.close()` after running all the trials (which does some housekeeping, writes out the logfile, etc.)
+
+You may include your call to `start_experiment` and your loop over trials in a method called `run` (like in the example above) but this is not mandatory (but we believe it's a nice way of structuring your code). With this setup, your class is ready to be used! You could for example run your session in the same file as you implemented your custom session by including the following at the very bottom of the file:
+
+```python
+
+# your custom class should be defined above
+if __name__ == '__main__':
+    my_sess = StroopSession('sub-01', output_dir='~/logs', settings_file='settings.yml')
+    my_sess.run()
 ```
 
 ### The `Trial` class
