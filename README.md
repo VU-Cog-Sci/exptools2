@@ -324,6 +324,64 @@ class SessionWithManyImages(Session):
             self.current_trial.run()
 ```
 
+### Overview: a complete experiment
+
+```python
+import random
+from exptools2.core import Trial, Session
+from psychopy.visual import TextStim, Circle
+
+
+class StroopTrial(Trial):
+    
+    def __init__(self, session, trial_nr, phase_durations, phase_names,
+                 parameters, timing, load_next_during_phase, 
+                 verbose, condition='congruent'):
+        """ Initializes a StroopTrial object. """
+        super().__init__(session, trial_nr, phase_durations, phase_names,
+                         parameters, timing, verbose, load_next_during_phase)
+        self.condition = condition
+        self.fixation_dot = Circle(self.session.win, radius=0.1, edges=100)
+        
+        if self.condition == 'congruent':
+            self.word = TextStim(self.session.win, text='red', color=(255, 0, 0))  # red!
+        else:
+            self.word = TextStim(self.session.win, text='red', color=(0, 255, 0))  # green!
+            
+    def draw(self):
+        if self.phase == 0:  # Python starts counting from 0, and so should you
+            self.fixation_dot.draw()
+        else:  # assuming that there are only 2 phases
+            self.word.draw()
+
+class StroopSession(Session):
+
+    def __init__(self, output_str, output_dir, settings_file, n_trials):
+        super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
+        self.n_trials = n_trails  # just an example argument
+        self.trials = []  # will be filled with Trials later
+        
+    def create_trials(self):
+        """ Creates trials (ideally before running your session!) """
+        for i in range(self.n_trials):
+            if i % 2 == 0:
+                condition = 'congruent'
+            else:
+                condition = 'incongruent'
+        
+            trial = StroopTrial(
+                session=self,
+                trial_nr=i,
+                phase_durations=(2, 1),
+                timing='seconds',
+                phase_names=('word, 'fix'),
+                parameters={'condition': condition}
+            )
+            self.trials.append(trial)
+            
+        random.shuffle(self.n_trials)
+```
+
 ### The `PylinkEyetrackerSession` class
 ...
 
