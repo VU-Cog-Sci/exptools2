@@ -46,6 +46,7 @@ An important part of `exptools2` is the settings-file, which is needed by the `S
 Your custom settings-file should be a [YAML](https://en.wikipedia.org/wiki/YAML) file, i.e., it should use the YAML-specific syntax. Any settings-file may contain the following top-level items: `preferences`, `window`, `monitor`, `mouse`, `eyetracker`, and `mri`. Each top-level item may contain one or more "key: value" pairs, in which the "key" represents the name of the particular parameter and the "value" represents the actual value of the parameter. For example, the `monitor` top-level item contains (amongst others) the parameters `name`, `width`, `distance`, and `gamma`. To specify your experiment-specific parameters for these settings, include the following in your settings-file:
 
 ```yaml
+# Note that you may indent your file with any number of spaces, as long as it's consistent
 monitor:
   name: monitor_lab201
   width: 50  # width of monitor (in cm)
@@ -53,7 +54,30 @@ monitor:
   gamma: 1  # specific value for gamma correction
 ```
 
-The most important items are the `window` and `monitor` items. These should 
+It is important to set these parameter values specific to your experiment, for example if you want to specify the size of stimuli in visual degree angle (the default of `exptools`). Within the base `Session`, the parameters for the `monitor` settings will be used for initializing a Psychopy [`Monitor`](https://www.psychopy.org/api/monitors.html) object. As such, you can include *any* argument from the Psychopy `Monitor` class in your settings file. For example, if you want to set the `verbose` parameter of the `Monitor` object to `True`, you could simply include this parameter in the settings-file:
+
+```yaml
+monitor:
+  name: monitor_lab201
+  width: 50  # width of monitor (in cm)
+  distance: 80  # distance of participant from monitor (in cm)
+  gamma: 1  # specific value for gamma correction
+  verbose: True
+```
+
+The same idea applies to the `window` item (which refers to the parameters for the Psychopy [`Window`](https://www.psychopy.org/api/visual/window.html) class), the `mouse` item (which refers to the parameters for the Psychopy [`Mouse`](https://www.psychopy.org/api/event.html) class), the `preferences` item (which refers to the Psychopy [`prefs`](http://www.psychopy.org/api/preferences.html) class), and the `mri` item (which refers to the Psychopy [`SyncGenerator`](https://www.psychopy.org/api/hardware/emulator.html) class).
+
+For example, amongst many other arguments, the Psychopy `Window` class contains the argument `units` (which sets the default units for stimulus size). If you want to set this, e.g., to pixels (`pix`) instead of visual degree angle (`deg`, the package's default), you include the following in your custom settings-file:
+
+```yaml
+window:
+  units: pix
+```
+
+If you specify a parameter in your custom settings-file that is *also* included in the default settings-file (such as `size` in the `window` top-level item), your custom parameter will overwrite the default. Also, any parameter that is not explicitly set in your settings-file will inherit the default from the default settings-file. 
+
+#### Eyetracker settings
+Unlike the other top-level items in settings-files, parameters under the `eyetracker` item do not specifically refer to the arguments of a particular Psychopy class. Instead, it contains three "main" parameters: `address`, referring to the Eyelink eyetracker IP, `dot_size`, referring to the size of dots during calibration in visual degree angle, and most importantly `options`, which contains lower-level key-value settings. These settings under `options` correspond to Eyelink specific settings (which can be found in the [Eyelink Programmer's Guide](http://download.sr-support.com/dispdoc/)).
 
 ### The `Trial` class
 
