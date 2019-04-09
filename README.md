@@ -124,7 +124,7 @@ As you can see above, custom sessions should do three things:
 - create trials *before* running your session (e.g., in a method called `create_trials`, but you may call/implement this any way you like);
 - call `self.start_experiment()` whenever you want to start running your trials (this method sets the timer which keeps track of trial/phase onsets);
 - loop over trials and run them (using the `run` method of `Trial` objects, which are explained in the next section);
-- call `self.close()` after running all the trials (which does some housekeeping, writes out the logfile, etc.)
+- call `self.close()` after rpass unning all the trials (which does some housekeeping, writes out the logfile, etc.)
 
 You may include your call to `start_experiment` and your loop over trials in a method called `run` (like in the example above) but this is not mandatory (but we believe it's a nice way of structuring your code). With this setup, your class is ready to be used! You could for example run your session in the same file as you implemented your custom session by including the following at the very bottom of the file:
 
@@ -149,6 +149,20 @@ from exptools2.core import Trial
 class StroopTrial(Trial):
     pass 
 ```
+
+Now, we of course want to tailor this `StroopTrial` class to our experiment. This most likely starts with defining the stimuli that you want to show during your trial. In a Stroop-task, this usually is a (colored) word and (afterwards) a fixation cross/dot. To reduce the chance of timing issues, we recommend initializing these stimuli "as soon as possible", for example, during initialization (i.e., within the `__init__()` method). Let's do that for our `StroopTrial` class. We'll build a very simple version of the Stroop-task, in which trials can be congruent (the word "red" in the color red) or incongruent (the word "red" in the color green). (Usually, the Stroop-task of course contains more words/colors.) 
+
+```python
+
+class StroopTrial(Trial):
+    
+    def __init__(self, condition='congruent'):
+        super().__init__()
+        self.condition = condition
+        
+
+```
+
 
 ### The `PylinkEyetrackerSession` class
 ...
