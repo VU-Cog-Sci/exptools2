@@ -12,16 +12,23 @@ from exptools2.core import Session
 
 class StroopSession(Session):
 
-  def __init__(self, n_trials):
-      """ Initializes StroopSession object. 
+    def __init__(self, output_str, output_dir, settings_file, n_trials):
+        """ Initializes StroopSession object. 
       
-      Parameters
-      ----------
-      n_trials : int
-          Number of trials to present
-      """
-      super().__init__()  # initialize parent class!
-      self.n_trials = n_trails  # just an example argument
+        Parameters
+        ----------
+        output_str : str
+            Basename for all output-files (like logs), e.g., "sub-01_task-stroop_run-1"
+        output_dir : str
+            Path to desired output-directory (default: None, which results in $pwd/logs)
+        settings_file : str
+            Path to yaml-file with settings (default: None, which results in the package's
+            default settings file (in data/default_settings.yml)
+        n_trials : int
+            Number of trials to present (a custom parameter for this class)
+        """
+        super().__init__()  # initialize parent class!
+        self.n_trials = n_trails  # just an example argument
 ```
 
 ### The `Trial` class
