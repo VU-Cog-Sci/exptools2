@@ -257,7 +257,9 @@ The `phase_durations` arguments does what it suggest: it defines how long each p
 But what do this `1` and `2` refer to in the `phase_durations` argument? This depends on the `timing` argument! The `timing` argument can take two values: either `'seconds'` (the default) or `'frames'`. So, settings `phase_durations` to `(1, 2)` and `timing` to `'seconds'` will show phase zero for 1 second and phase one for two seconds. If you would set `timing` to `'frames'`, however, it will show phase zero for 1 frame and phase one to 2 frames -- the exact duration in seconds, here, thus depends on the specific framerate of your monitor! Technically, the `'frames'` method should be more accurate in terms of duration, *assuming that you don't drop any frames during your experiment*. Use this method if timing/stimulus onsets are *absolutely* crucial (like in EEG/MEG experiments or subliminal/unconscious/masking tasks).
 
 #### The `phase_names` and `parameters` arguments
-The `phase_names` and `parameters` arguments have to do with logging your trial-information. They are optional, but serve to make your logfile more information/more complete.
+The `phase_names` and `parameters` arguments have to do with logging your trial-information. They are optional, but serve to make your logfile more information/more complete. Basically, `exptools` will log each phase of every trial separately. So every phase will be logged as a separate row in your logfile (in addition to responses by the participant, which will also get their own row). By default, the logfile contains a column called `event_type`, which will by default be `"stim"` for every phase. But if you want to give every phase a separate name, you can assign a tuple (or list) of strings to `phase_names`, e.g., `phase_names=('word', 'fix')` for our `StroopTrial`. 
+
+The `parameters` argument servers a similar function. The argument, which should be a dictionary, allows you to add extra information to your logfile for that trial. For our `StroopTrial`, this could for example be the `condition` (i.e., either `"congruent"` or `"incongruent"`). 
 
 
 ### The `PylinkEyetrackerSession` class
@@ -266,7 +268,7 @@ The `phase_names` and `parameters` arguments have to do with logging your trial-
 ## Tips and tricks / recommendations
 - something about frames vs. seconds
 - load_during_next
-
+will contain 
 ## Installation instructions
 The package is not yet pip-installable. To install it, clone the repository (`git clone https://github.com/VU-Cog-Sci/exptools2.git`) and install the package (`python setup.py install`). The package assumes that the following dependencies are installed:
 
