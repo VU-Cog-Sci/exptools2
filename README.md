@@ -11,6 +11,13 @@ In the `core` module of `exptools`, the `Session` class is defined. This class r
 from exptools2.core import Session
 
 class StroopSession(Session):
+    pass
+```
+
+Right now, the example `StroopSession` class is a copy of the base `Session` class, just with a different name. This is of course not how we want to use it: we want to adapt it such that it is specific to our experiment! We may even want to modify the way we initialize a `StroopSession` object. For example, suppose that we want to add an attribute called `n_trials` to our object during initialization (which may be used later in other methods). As such, we should overwrite the class' `__init__` method:
+
+```python
+class StroopSession(Session):
 
     def __init__(self, output_str, output_dir, settings_file, n_trials):
         """ Initializes StroopSession object. 
@@ -27,9 +34,26 @@ class StroopSession(Session):
         n_trials : int
             Number of trials to present (a custom parameter for this class)
         """
-        super().__init__()  # initialize parent class!
+        super().__init__(output_str, output_dir, settings_file)  # initialize parent class!
         self.n_trials = n_trails  # just an example argument
 ```
+
+Note that we're still calling the parent's `__init__` method (the `super().__init__()` call), because this is executing the boilerplate code that is needed to setup any `Session`! Note that the base `Session` class is initialized with three arguments: `output_str`, `output_dir`, and `settings_file`, of which only `output_str` is mandatory. Don't forget to add these arguments to the `__init__` method of your custom class! After calling the `super().__init__()` function, you may add whatever you like, such as binding the `n_trials` variable to `self`.
+
+#### The settings-file
+An important part of `exptools2` is the settings-file, which is needed by the `Session` class (and thus every custom session class which inherits from `Session`). The package contains a default settings-file (in `data/default_settings.yml`), which is used when you do not provide a custom settings-file to the session object during initialization. This is fine for testing your experiment, but for your "real" experiment, you should provide your own (custom) settings-file that is specific to your experiment. Your custom settings-file does not have to contain *all* possible settings; those settings that are not listed in your custom settings-file will be "inherited" from the default-settings file (which contain sensible defaults). 
+
+Your custom settings-file should be a [YAML](https://en.wikipedia.org/wiki/YAML) file, i.e., it should use the YAML-specific syntax. Any settings-file may contain the following top-level items: `preferences`, `window`, `monitor`, `mouse`, `eyetracker`, and `mri`. Each top-level item may contain one or more "key: value" pairs, in which the "key" represents the name of the particular parameter and the "value" represents the actual value of the parameter. For example, the `monitor` top-level item contains (amongst others) the parameters `name`, `width`, `distance`, and `gamma`. To specify your experiment-specific parameters for these settings, include the following in your settings-file:
+
+```yaml
+monitor:
+  name: monitor_lab201
+  width: 50  # width of monitor (in cm)
+  distance: 80  # distance of participant from monitor (in cm)
+  gamma: 1  # specific value for gamma correction
+```
+
+The most important items are the `window` and `monitor` items. These should 
 
 ### The `Trial` class
 
