@@ -1,11 +1,11 @@
 import os
 import yaml
+import collections
 import os.path as op
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from psychopy import core
-from psychopy.iohub import launchHubServer
 from psychopy.visual import Window, TextStim
 from psychopy.event import waitKeys, Mouse
 from psychopy.monitors import Monitor
@@ -92,9 +92,9 @@ class Session:
                 user_settings = yaml.safe_load(f_in)
             
             # Update (and potentially overwrite) default settings
-            default_settings.update(user_settings)
+            _merge_settings(default_settings, user_settings)
             settings = default_settings
-
+        
         # Write settings to sub dir
         if not op.isdir(self.output_dir):
             os.makedirs(self.output_dir) 
@@ -223,7 +223,7 @@ class Session:
             return None
 
         self.win.callOnFlip(self._set_exp_stop)
-        self.win.flip(clearBuffer=True)
+        self.win.flip()
         self.win.recordFrameIntervals = False
 
         print(f"\nDuration experiment: {self.exp_stop:.3f}\n")
@@ -273,62 +273,26 @@ class Session:
         
         core.quit()
 
+def _merge_settings(default, user):
+    """ Recursive dict merge. Inspired by dict.update(), instead of
+    updating only top-level keys, dict_merge recurses down into dicts nested
+    to an arbitrary depth, updating keys. The merge_dct is merged into
+    Adapted from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9.
+    
+    Parameters
+    ----------
+    default : dict
+        To-be-updated dict
+    user : dict
+        Dict to merge in default
 
-class EyeTrackerSession(Session):
-    """ EyetrackerSession class."""
-
-    def __init__(self, output_str, eyetracker_on=True, **kwargs):
-        """ Initializes EyetrackerSession class.
-        
-        parameters
-        ----------
-        output_str : str
-            Name (string) for output-files (e.g., 'sub-01_ses-post_run-1')
-        eyetracker_on : bool
-            Whether the eyetracker is actually on
-        kwargs : dict
-            Extra arguments to base Session class initialization
-
-        attributes
-        ----------
-        tracker : Eyetracker object
-            IOHub or Pylink Eyetracker object
-        """
-        super().__init__(output_str, **kwargs)
-        self.eyetracker_on=eyetracker_on
-
-    def init_eyetracker(self):
-        """ Initializes eyetracker.
-
-        After initialization, tracker object ("device" in iohub lingo)
-        can be accessed from self.tracker
-        """
-        if not self.eyetracker_on:
-            raise ValueError("Cannot initialize eyetracker if eyetracker_on=False!")
-
-        EYETRACKER_NAME = 'eyetracker.hw.sr_research.eyelink.EyeTracker'
-        self.iohub = launchHubServer(
-            psychopy_monitor_name=self.monitor.name,
-            **{EYETRACKER_NAME: {
-                'enable_interface_without_connection': False,
-            }}
-        )
-
-        self.tracker = self.iohub.devices.eyetracker
-
-    def start_recording_eyetracker(self):
-        self.tracker.setRecordingState(True)
-
-    def stop_recording_eyetracker(self):
-        self.tracker.setRecordingState(False)
-
-    def calibrate_eyetracker(self):
-
-        if self.tracker is None:
-            raise ValueError("Cannot calibrate tracker if it's not initialized yet!")
-
-        self.tracker.runSetupProcedure()
-
-    def close_tracker(self):
-        self.stop_recording_eyetracker()
-        self.iohub.quit()
+    Returns
+    -------
+    None
+    """
+    for k, v in user.items():
+        if (k in default and isinstance(default[k], dict)
+            and isinstance(user[k], collections.Mapping)):
+            _merge_settings(default[k], user[k])
+        else:
+            default[k] = user[k]

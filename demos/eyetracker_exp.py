@@ -1,16 +1,29 @@
-from exptools2.session import EyeTrackerSession
-from exptools2.trial import Trial
+from exptools2.core import PylinkEyetrackerSession, PylinkTrial
+from exptools2.core import Trial
 from psychopy.visual import TextStim
-from simple_exp import TestTrial
 
 
-class TestEyetrackerSession(EyeTrackerSession):
+class TestTrial(PylinkTrial):
+    """ Simple trial with text (trial x) and fixation. """
+    def __init__(self, session, trial_nr, phase_durations, txt=None, **kwargs):
+        super().__init__(session, trial_nr, phase_durations, **kwargs)
+        self.txt = TextStim(self.session.win, txt) 
+
+    def draw(self):
+        """ Draws stimuli """
+        if self.phase == 0:
+            self.txt.draw()
+        else:
+            self.session.default_fix.draw()
+
+class TestEyetrackerSession(PylinkEyetrackerSession):
     """ Simple session with x trials. """
 
-    def __init__(self, output_str, settings_file=None, n_trials=10, eyetracker_on=True):
+    def __init__(self, output_str, output_dir=None, settings_file=None, n_trials=10, eyetracker_on=True):
         """ Initializes TestSession object. """
         self.n_trials = n_trials
-        super().__init__(output_str, settings_file, eyetracker_on)
+        super().__init__(output_str, output_dir=output_dir,
+                         settings_file=settings_file, eyetracker_on=eyetracker_on)
 
     def create_trials(self, durations=(.5, .5), timing='seconds'):
         self.trials = []
@@ -27,15 +40,13 @@ class TestEyetrackerSession(EyeTrackerSession):
     def run(self):
         """ Runs experiment. """
 
-        self.init_eyetracker()
         self.calibrate_eyetracker()
-        self.start_recording_eyetracker()
         self.start_experiment()
-
+        self.start_recording_eyetracker()
         for trial in self.trials:
             trial.run()
 
-        self.close()
+        self.close()  # contains tracker.stopRecording()
 
 
 if __name__ == '__main__':

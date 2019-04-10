@@ -1,12 +1,3 @@
-"""
-created on 06/03/2019
-Author: Sjoerd Evelo
---------------------
-functions:
-----------
-save_experiment
-    Saves Session object using specified engine
-"""
 import pickle
 import joblib
 

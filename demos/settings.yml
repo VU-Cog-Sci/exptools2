@@ -1,0 +1,36 @@
+preferences:
+  general:
+    audioLib: SoundDevice
+    units: deg
+
+window:
+  size: [1440, 900]
+  pos: [0, 0]
+  color: [0, 0, 0]
+  fullscr: True
+  winType: pyglet
+  waitBlanking: True
+  screen: 0
+
+monitor:
+  name: default
+  width: 50  # in cm
+  distance: 80  # in cm
+  gamma: 1
+
+mouse:
+  visible: False
+
+eyetracker:
+  model: eyelink
+  CNUM: 9
+  MIN_CALIB_FIX: 1000
+
+mri:
+  simulate: False
+  TR: 2.0  # seconds between volume acquisitions
+  TA: 2.0  # seconds to acquire one volume
+  volumes: 10  # number of 3D volumes to obtain in a given scanning run
+  sync: t  # character used as flag for sync timing, default=‘5’
+  skip: 0  # how many frames to silently omit initially during T1 stabilization, no sync pulse.
+  sound: False  # simulate scanner noise
