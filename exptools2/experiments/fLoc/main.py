@@ -10,7 +10,8 @@ from .session import FLocSession
 @click.option('--scrambled', is_flag=True, help='Whether to include scrambled category')
 @click.option('--settings', default=None, type=str, help='Settings file')
 @click.option('--stimdir', default=None, type=str, help='fLoc stimulus directory')
-def main_api(sub, run, dummies, scrambled, settings, stimdir):
+@click.option('--ntrials', default=None, type=int, help='number of trials (for debugging)')
+def main_api(sub, run, dummies, scrambled, settings, stimdir, ntrials):
 
     if stimdir is None:
         stimdir = op.abspath('fLoc')
@@ -22,7 +23,8 @@ def main_api(sub, run, dummies, scrambled, settings, stimdir):
         settings_file=settings,
         stim_dir=stimdir,
         scrambled=scrambled,
-        dummies=dummies
+        dummies=dummies,
+        ntrials=ntrials
     )
 
     fLoc_session.run()

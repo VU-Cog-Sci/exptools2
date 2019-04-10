@@ -28,12 +28,12 @@ eyetracker:
     binocular_enabled: NO  # [YES]
     heuristic_filter: 2  # [0, OFF, 1, ON]
     pupil_size_diameter: YES  # [NO]
-    simulate_head_camera: NO  # [YES]
+    #simulate_head_camera: NO  # [YES]  # GIVES ERROR?
     #simulation_screen_distance
     file_event_filter: 'LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON,INPUT'
     link_event_filter: 'LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON'
     link_sample_data: 'LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS,HTARGET'
-    file_sample_data: LEFT,RIGHT,GAZE,AREA,GAZERES,STATUS,HTARGET,INPUT'
+    #file_sample_data: LEFT,RIGHT,GAZE,AREA,GAZERES,STATUS,HTARGET,INPUT'  # GIVES ERROR?
     calibration_type: HV9  # [H3, HV3, HV5, HV9]
     x_gaze_constraint: AUTO
     y_gaze_constraint: AUTO

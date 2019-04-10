@@ -57,9 +57,9 @@ class PylinkEyetrackerSession(Session):
 
     def _set_options_tracker(self):
         """ Sets a bunch of options . """
-
-        for opt_name, opt_val in self.et_settings['options']:
-            self.tracker.sendCommand(f'{opt_name} = {opt_val}')
+        for opt_name, opt_val in self.et_settings['options'].items():
+            cmd = f'{opt_name} = {opt_val}'
+            self.tracker.sendCommand(cmd)
             core.wait(0.05)  # give it some time
 
     def _create_display(self):

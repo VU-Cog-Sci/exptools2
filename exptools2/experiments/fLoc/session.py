@@ -32,7 +32,7 @@ class FLocTrial(Trial):
 class FLocSession(Session):
     """ Simple session with x trials. """
     def __init__(self, sub, run, output_str, stim_dir, scrambled, dummies,
-                 rt_cutoff=1, output_dir=None, settings_file=None):
+                 ntrials=None, rt_cutoff=1, output_dir=None, settings_file=None):
         """ Initializes TestSession object. """
 
         msg = ("When using this localizer, please acknowledge the original "
@@ -50,6 +50,7 @@ class FLocSession(Session):
         self.stim_dir = stim_dir
         self.scrambled = scrambled
         self.dummies = dummies
+        self.ntrials = ntrials
         self.rt_cutoff = rt_cutoff
 
         trials_dir = op.join(op.dirname(op.dirname(op.dirname(__file__))), 'data')
@@ -61,6 +62,10 @@ class FLocSession(Session):
         df = pd.read_csv(stim_file, sep='\t')
         sub_id = f'sub-{sub}'
         self.stim_df = df.query('sub_id == @sub_id & run == @run')
+        
+        if self.ntrials is not None:
+            self.stim_df = self.stim_df.iloc[:self.ntrials, :]
+
         self.stim_df.index = np.arange(0, len(self.stim_df), dtype=int)
         self.trials = []
         self.current_trial = None

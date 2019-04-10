@@ -172,7 +172,7 @@ class Trial:
         except Exception as err:  # not quite happy about this try/except part ...
             logging.warn('Cannot create trial - probably at last one '
                             f'(trial {self.trial_nr})!')
-            raise(err)
+            #raise(err)
 
         load_dur = self.session.clock.getTime() - load_start
 

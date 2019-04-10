@@ -221,7 +221,7 @@ class Session:
 
         if self.closed:  # already closed!
             return None
-
+        
         self.win.callOnFlip(self._set_exp_stop)
         self.win.flip()
         self.win.recordFrameIntervals = False
