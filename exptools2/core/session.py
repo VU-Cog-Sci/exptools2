@@ -1,5 +1,6 @@
 import os
 import yaml
+import collections
 import os.path as op
 import numpy as np
 import pandas as pd
@@ -91,9 +92,9 @@ class Session:
                 user_settings = yaml.safe_load(f_in)
             
             # Update (and potentially overwrite) default settings
-            default_settings.update(user_settings)
+            _merge_settings(default_settings, user_settings)
             settings = default_settings
-
+        
         # Write settings to sub dir
         if not op.isdir(self.output_dir):
             os.makedirs(self.output_dir) 
@@ -271,3 +272,27 @@ class Session:
             self.close()
         
         core.quit()
+
+def _merge_settings(default, user):
+    """ Recursive dict merge. Inspired by dict.update(), instead of
+    updating only top-level keys, dict_merge recurses down into dicts nested
+    to an arbitrary depth, updating keys. The merge_dct is merged into
+    Adapted from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9.
+    
+    Parameters
+    ----------
+    default : dict
+        To-be-updated dict
+    user : dict
+        Dict to merge in default
+
+    Returns
+    -------
+    None
+    """
+    for k, v in user.items():
+        if (k in default and isinstance(default[k], dict)
+            and isinstance(user[k], collections.Mapping)):
+            _merge_settings(default[k], user[k])
+        else:
+            default[k] = user[k]
