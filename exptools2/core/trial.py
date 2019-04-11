@@ -57,6 +57,7 @@ class Trial:
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
         
+        self.has_tracker = hasattr(self.session, 'eyetracker')
         self.start_trial = None
         self.exit_phase = False
         self.n_phase = len(phase_durations)
@@ -98,7 +99,7 @@ class Trial:
 
         if self.phase == 0:
             self.start_trial = onset
-            
+
             if self.verbose:
                 print(f'Starting trial {self.trial_nr}')
 
@@ -106,7 +107,12 @@ class Trial:
 
         if self.verbose:
             print(msg)
-        
+
+        if self.has_tracker:  # send msg to eyetracker
+            msg = f'start_trial-{self.trial_nr}_phase-{self.phase}'
+            self.session.tracker.sendMessage(msg)
+            # Should be log more to the eyetracker? Like 'parameters'?
+
         # add to global log
         idx = self.session.global_log.shape[0]
         self.session.global_log.loc[idx, 'onset'] = onset
@@ -163,6 +169,14 @@ class Trial:
                     self.last_resp_onset = t
 
     def load_next_trial(self, phase_dur):
+        """ Loads the next trial by calling the session's
+        'create_trial' method.
+
+        Parameters
+        ----------
+        phase_dur : int/float
+            Duration of phase
+        """
         self.draw()  # draw this phase, then load
         self.session.win.flip()
 
@@ -172,17 +186,23 @@ class Trial:
         except Exception as err:  # not quite happy about this try/except part ...
             logging.warn('Cannot create trial - probably at last one '
                             f'(trial {self.trial_nr})!')
-            #raise(err)
+            print(err)
 
         load_dur = self.session.clock.getTime() - load_start
+        if self.timing == 'frames':
+            load_dur /= self.session.actual_framerate
 
         if load_dur > phase_dur:  # overshoot! not good!
-            logging.warn(f'Time to load stimulus ({load_dur:.5f}) is longer than'
-                            f' phase-duration {phase_dur:.5f} (trial {self.trial_nr})!')
+            logging.warn(f'Time to load stimulus ({load_dur:.5f} {self.timing}) is longer than'
+                         f' phase-duration {phase_dur:.5f} (trial {self.trial_nr})!')
 
     def run(self):
         """ Runs through phases. Should not be subclassed unless
         really necessary. """
+
+        if self.has_tracker:  # Sets status message
+            cmd = f"record_status_message 'trial {self.trial_nr}'"
+            self.session.tracker.sendCommand(cmd)
 
         # Because the first flip happens when the experiment starts,
         # we need to compensate for this during the first trial/phase
@@ -198,7 +218,7 @@ class Trial:
         for phase_dur in self.phase_durations:  # loop over phase durations
             self.session.win.callOnFlip(self.log_phase_info)
 
-            # Start loading in next trial during this phase
+            # Start loading in next trial during this phase (if not None)
             if self.load_next_during_phase == self.phase:
                 self.load_next_trial(phase_dur)
 
@@ -214,7 +234,7 @@ class Trial:
                 # Loop for a predetermined number of frames
                 # Note: only works when you're sure you're not 
                 # dropping frames
-                for frame_nr in range(phase_dur):
+                for _ in range(phase_dur):
 
                     if self.exit_phase:
                         break
@@ -225,7 +245,7 @@ class Trial:
                     self.session.nr_frames += 1
 
             if self.exit_phase:  # broke out of phase loop
-                self.session.timer.reset()
+                self.session.timer.reset()  # reset timer!
                 self.exit_phase = False  # reset exit_phase
 
             self.phase += 1  # advance phase

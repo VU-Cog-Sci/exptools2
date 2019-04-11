@@ -1,6 +1,6 @@
 preferences:
   general:
-    audioLib: SoundDevice
+    audioLib: sounddevice
     units: deg
 
 window:

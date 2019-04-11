@@ -1,5 +1,4 @@
 import pickle
-import joblib
 
 
 def save_experiment(session, output_str, engine='pickle'):
@@ -18,7 +17,5 @@ def save_experiment(session, output_str, engine='pickle'):
     if engine == 'pickle':
         with open(output_str + '.pkl', 'w') as f_out:
             pickle.dump(session, f_out)
-    elif engine == 'joblib':
-        joblib.dump(session, output_str + '.jl')
     else:
-        raise ValueError("Engine not recognized, use 'pickle' or 'joblib'")
+        raise ValueError("Engine not recognized, use 'pickle'")

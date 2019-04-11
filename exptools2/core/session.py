@@ -6,12 +6,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from psychopy import core
+from psychopy.sound import Sound
+from psychopy.hardware.emulator import SyncGenerator
 from psychopy.visual import Window, TextStim
 from psychopy.event import waitKeys, Mouse
 from psychopy.monitors import Monitor
 from psychopy import logging
-from psychopy.hardware.emulator import SyncGenerator
 from psychopy import prefs as psychopy_prefs
+
 
 from ..stimuli import create_circle_fixation
 

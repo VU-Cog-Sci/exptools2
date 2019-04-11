@@ -1,4 +1,4 @@
-import pylink
+import warnings
 import os.path as op
 import numpy as np
 from datetime import datetime
@@ -11,6 +11,15 @@ from psychopy.visual import TextStim, Circle
 
 from .session import Session
 from .trial import Trial
+
+try:
+    import pylink
+except ModuleNotFoundError:
+    msg = "Pylink is not installed! Eyetracker cannot be used"
+    warnings.warn(msg)
+    PYLINK_AVAILABLE = False
+else:
+    PYLINK_AVAILABLE = True    
 
 
 class PylinkEyetrackerSession(Session):
@@ -43,7 +52,7 @@ class PylinkEyetrackerSession(Session):
 
     def _create_tracker(self):
         """ Creates tracker object upon initialization. """
-        if not self.eyetracker_on:
+        if not self.eyetracker_on or not PYLINK_AVAILABLE:
             return None
 
         tracker = pylink.EyeLink(self.et_settings.get('address'))
@@ -64,6 +73,10 @@ class PylinkEyetrackerSession(Session):
 
     def _create_display(self):
         """ Creates a custom display upon initialization ."""
+        
+        if not self.eyetracker_on or not PYLINK_AVAILABLE:
+            return None
+
         display = PsychopyCustomDisplay(
             self.tracker, self.win, self.settings,
         )
@@ -102,17 +115,6 @@ class PylinkEyetrackerSession(Session):
             f_out = op.join(self.output_dir, self.output_str + '.edf')
             self.tracker.receiveDataFile(self.edf_name, f_out)
             self.tracker.close()
-
-
-class PylinkTrial(Trial):
-    # Do we really need a separate class for this?
-    # Or should we build this into the regular Trial?
-    def run(self):
-        """ Sets trialid and calls run of parent class. """
-        # This should show (e.g.) different phases and trial nr
-        # (but then it should be inside the parent run method)
-        self.session.tracker.sendCommand("record_status_message 'TEST!'")
-        super().run()
 
 
 class IOHubEyeTrackerSession(Session):
@@ -175,142 +177,144 @@ class IOHubEyeTrackerSession(Session):
         self.iohub.quit()
 
 
-class PsychopyCustomDisplay(pylink.EyeLinkCustomDisplay):
-    """ Custom display for Eyelink eyetracker.
-    Modified from the 'pylinkwrapper' package by Nick DiQuattro
-    (https://github.com/ndiquattro/pylinkwrapper). All credits
-    go to him.
-    """
-    def __init__(self, tracker, win, settings):
-        """ Initializes PsychopyCustomDisplay object.
+if PYLINK_AVAILABLE:  # super ugly, but don't know an elegant fix atm
 
+    class PsychopyCustomDisplay(pylink.EyeLinkCustomDisplay):
+        """ Custom display for Eyelink eyetracker.
+        Modified from the 'pylinkwrapper' package by Nick DiQuattro
+        (https://github.com/ndiquattro/pylinkwrapper). All credits
+        go to him.
         """
-        super().__init__()
-        self.tracker = tracker
-        self.win = win
-        self.settings = settings  # from session
-        self.__target_beep__ = Sound(800, secs=.1)
-        self.__target_beep__done__ = Sound(1200, secs=.1)
-        self.__target_beep__error__ = Sound(400, secs=.1)
-        #self.backcolor = self.win.color
+        def __init__(self, tracker, win, settings):
+            """ Initializes PsychopyCustomDisplay object.
 
-        dot_size_pix = misc.deg2pix(self.settings['eyetracker'].get('dot_size'),
-                                    self.win.monitor)
-        self.targetout = Circle(
-            self.win, pos=(0, 0), radius=dot_size_pix, fillColor='black',
-            units='pix', lineColor='black'
-        )
+            """
+            super().__init__()
+            self.tracker = tracker
+            self.win = win
+            self.settings = settings  # from session
+            self.__target_beep__ = Sound(800, secs=.1)
+            self.__target_beep__done__ = Sound(1200, secs=.1)
+            self.__target_beep__error__ = Sound(400, secs=.1)
+            #self.backcolor = self.win.color
 
-        self.targetin = Circle(
-            self.win, pos=(0, 0), radius=3, fillColor=0,
-            lineColor=0, units='pix', opacity=0
-        )
-        win.flip()
+            dot_size_pix = misc.deg2pix(self.settings['eyetracker'].get('dot_size'),
+                                        self.win.monitor)
+            self.targetout = Circle(
+                self.win, pos=(0, 0), radius=dot_size_pix, fillColor='black',
+                units='pix', lineColor='black'
+            )
 
-    def setup_cal_display(self):
-        txt = TextStim(
-            self.win, text="Please follow the dot. Try not to anticipate its movements.",
-            pos=(0, 100), color='black', units='pix'
-        )
+            self.targetin = Circle(
+                self.win, pos=(0, 0), radius=3, fillColor=0,
+                lineColor=0, units='pix', opacity=0
+            )
+            win.flip()
 
-        txt.draw()
-        self.targetout.draw()
-        self.win.flip()
+        def setup_cal_display(self):
+            txt = TextStim(
+                self.win, text="Please follow the dot. Try not to anticipate its movements.",
+                pos=(0, 100), color='black', units='pix'
+            )
 
-    def exit_cal_display(self):
-        self.clear_cal_display()
+            txt.draw()
+            self.targetout.draw()
+            self.win.flip()
 
-    def clear_cal_display(self):
-        self.setup_cal_display()
+        def exit_cal_display(self):
+            self.clear_cal_display()
 
-    def erase_cal_target(self):
-        self.win.flip()
+        def clear_cal_display(self):
+            self.setup_cal_display()
 
-    def draw_cal_target(self, x, y):
-        # Convert to psychopy coordinates
-        x = x - (self.win.size[0] / 2)
-        y = -(y - (self.win.size[1] / 2))
+        def erase_cal_target(self):
+            self.win.flip()
 
-        # Set calibration target position
-        self.targetout.pos = (x, y)
-        self.targetin.pos = (x, y)
+        def draw_cal_target(self, x, y):
+            # Convert to psychopy coordinates
+            x = x - (self.win.size[0] / 2)
+            y = -(y - (self.win.size[1] / 2))
 
-        # Display
-        self.targetout.draw()
-        self.targetin.draw()
-        self.win.flip()
+            # Set calibration target position
+            self.targetout.pos = (x, y)
+            self.targetin.pos = (x, y)
 
-    def setup_image_display(self, width, height):
+            # Display
+            self.targetout.draw()
+            self.targetin.draw()
+            self.win.flip()
 
-        self.size = (width / 2, height / 2)
-        self.clear_cal_display()
-        self.last_mouse_state = -1
+        def setup_image_display(self, width, height):
 
-        # Create array to hold image data later
-        if self.rgb_index_array is None:
-            self.rgb_index_array = np.zeros((self.size[1], self.size[0]),
-                                            dtype=np.uint8)
+            self.size = (width / 2, height / 2)
+            self.clear_cal_display()
+            self.last_mouse_state = -1
 
-    def image_title(self, text):
-        # Display or update Pupil/CR info on image screen
-        if self.imagetitlestim is None:
-            self.imagetitlestim = TextStim(self.window,
-                                                  text=text,
-                                                  pos=(0, self.window.size[
-                                                      1] / 2 - 15), height=28,
-                                                  color=self.txtcol,
-                                                  alignHoriz='center',
-                                                  alignVert='top',
-                                                  wrapWidth=self.window.size[
-                                                                0] * .8,
-                                                  units='pix')
-        else:
-            self.imagetitlestim.setText(text)
+            # Create array to hold image data later
+            if self.rgb_index_array is None:
+                self.rgb_index_array = np.zeros((self.size[1], self.size[0]),
+                                                dtype=np.uint8)
 
-    def exit_image_display(self):
-        self.clear_cal_display()
+        def image_title(self, text):
+            # Display or update Pupil/CR info on image screen
+            if self.imagetitlestim is None:
+                self.imagetitlestim = TextStim(self.window,
+                                                    text=text,
+                                                    pos=(0, self.window.size[
+                                                        1] / 2 - 15), height=28,
+                                                    color=self.txtcol,
+                                                    alignHoriz='center',
+                                                    alignVert='top',
+                                                    wrapWidth=self.window.size[
+                                                                    0] * .8,
+                                                    units='pix')
+            else:
+                self.imagetitlestim.setText(text)
 
-    def alert_printf(self, msg):
-        print("alert_printf %s" % msg)
+        def exit_image_display(self):
+            self.clear_cal_display()
 
-    def play_beep(self, beepid):
-        if beepid == pylink.DC_TARG_BEEP or beepid == pylink.CAL_TARG_BEEP:
-            self.__target_beep__.play()
-        elif beepid == pylink.CAL_ERR_BEEP or beepid == pylink.DC_ERR_BEEP:
-            self.__target_beep__error__.play()
-        else:  # CAL_GOOD_BEEP or DC_GOOD_BEEP
-            self.__target_beep__done__.play()
+        def alert_printf(self, msg):
+            print("alert_printf %s" % msg)
 
-    def get_input_key(self):
-            ky = []
-            v = event.getKeys()
-            for key in v:
-                pylink_key = None
-                if len(key) == 1:
-                    pylink_key = ord(key)
-                elif key == "escape":
-                    pylink_key = pylink.ESC_KEY
-                elif key == "return":
-                    pylink_key = pylink.ENTER_KEY
-                elif key == "pageup":
-                    pylink_key = pylink.PAGE_UP
-                elif key == "pagedown":
-                    pylink_key = pylink.PAGE_DOWN
-                elif key == "up":
-                    pylink_key = pylink.CURS_UP
-                elif key == "down":
-                    pylink_key = pylink.CURS_DOWN
-                elif key == "left":
-                    pylink_key = pylink.CURS_LEFT
-                elif key == "right":
-                    pylink_key = pylink.CURS_RIGHT
-                else:
-                    print(f'Error! :{key} is not a used key.')
-                    return
+        def play_beep(self, beepid):
+            if beepid == pylink.DC_TARG_BEEP or beepid == pylink.CAL_TARG_BEEP:
+                self.__target_beep__.play()
+            elif beepid == pylink.CAL_ERR_BEEP or beepid == pylink.DC_ERR_BEEP:
+                self.__target_beep__error__.play()
+            else:  # CAL_GOOD_BEEP or DC_GOOD_BEEP
+                self.__target_beep__done__.play()
 
-                ky.append(pylink.KeyInput(pylink_key, 0))
+        def get_input_key(self):
+                ky = []
+                v = event.getKeys()
+                for key in v:
+                    pylink_key = None
+                    if len(key) == 1:
+                        pylink_key = ord(key)
+                    elif key == "escape":
+                        pylink_key = pylink.ESC_KEY
+                    elif key == "return":
+                        pylink_key = pylink.ENTER_KEY
+                    elif key == "pageup":
+                        pylink_key = pylink.PAGE_UP
+                    elif key == "pagedown":
+                        pylink_key = pylink.PAGE_DOWN
+                    elif key == "up":
+                        pylink_key = pylink.CURS_UP
+                    elif key == "down":
+                        pylink_key = pylink.CURS_DOWN
+                    elif key == "left":
+                        pylink_key = pylink.CURS_LEFT
+                    elif key == "right":
+                        pylink_key = pylink.CURS_RIGHT
+                    else:
+                        print(f'Error! :{key} is not a used key.')
+                        return
 
-            return ky
+                    ky.append(pylink.KeyInput(pylink_key, 0))
 
-    def record_abort_hide(self):
-        pass
+                return ky
+
+        def record_abort_hide(self):
+            pass
