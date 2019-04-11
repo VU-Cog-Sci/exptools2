@@ -1,9 +1,9 @@
-from exptools2.core import PylinkEyetrackerSession, PylinkTrial
+from exptools2.core import PylinkEyetrackerSession
 from exptools2.core import Trial
 from psychopy.visual import TextStim
 
 
-class TestTrial(PylinkTrial):
+class TestTrial(Trial):
     """ Simple trial with text (trial x) and fixation. """
     def __init__(self, session, trial_nr, phase_durations, txt=None, **kwargs):
         super().__init__(session, trial_nr, phase_durations, **kwargs)

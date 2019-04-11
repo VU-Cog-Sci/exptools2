@@ -57,7 +57,7 @@ class Trial:
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
         
-        self.has_tracker = hasattr(self.session, 'eyetracker')
+        self.has_tracker = hasattr(self.session, 'tracker')
         self.start_trial = None
         self.exit_phase = False
         self.n_phase = len(phase_durations)
@@ -109,7 +109,7 @@ class Trial:
             print(msg)
 
         if self.has_tracker:  # send msg to eyetracker
-            msg = f'start_trial-{self.trial_nr}_phase-{self.phase}'
+            msg = f'start_type-stim_trial-{self.trial_nr}_phase-{self.phase}'
             self.session.tracker.sendMessage(msg)
             # Should be log more to the eyetracker? Like 'parameters'?
 
@@ -160,6 +160,10 @@ class Trial:
                 for param, val in self.parameters.items():
                     self.session.global_log.loc[idx, param] = val
 
+                if self.has_tracker:  # send msg to eyetracker
+                    msg = f'start_type-{event_type}_trial-{self.trial_nr}_phase-{self.phase}_key-{key}_time-{t}'
+                    self.session.tracker.sendMessage(msg)
+        
                 #self.trial_log['response_key'][self.phase].append(key)
                 #self.trial_log['response_onset'][self.phase].append(t)
                 #self.trial_log['response_time'][self.phase].append(t - self.start_trial)
