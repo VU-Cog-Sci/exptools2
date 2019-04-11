@@ -89,7 +89,7 @@ eyetracker:
   address: '100.1.1.1'
   dot_size: 0.1  # in deg
   options:
-    calibration_type: HV9
+    calibration_type: HV3
 ```
 
 ### Preparing, running, and closing your session
