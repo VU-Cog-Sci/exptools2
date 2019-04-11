@@ -321,7 +321,8 @@ class SessionWithManyImages(Session):
 
 ### Overview: a complete experiment
 
-```pythonimport random
+```python
+import random
 from exptools2.core import Trial, Session
 from psychopy.visual import TextStim, Circle
 
