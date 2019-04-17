@@ -56,14 +56,21 @@ class Trial:
         self.timing = timing
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
-        
-        self.has_tracker = hasattr(self.session, 'tracker')
+
         self.start_trial = None
         self.exit_phase = False
         self.n_phase = len(phase_durations)
         self.phase = 0
         self.last_resp = None
         self.last_resp_onset = None
+        if hasattr(self.session, 'tracker'):
+            if self.session.eyetracker_on:
+                self.eyetracker_on = True
+            else:
+                self.eyetracker_on = False
+        else:
+            self.eyetracker_on = False
+
         self._check_params()
 
     def _check_params(self):
@@ -108,7 +115,7 @@ class Trial:
         if self.verbose:
             print(msg)
 
-        if self.has_tracker:  # send msg to eyetracker
+        if self.eyetracker_on:  # send msg to eyetracker
             msg = f'start_type-stim_trial-{self.trial_nr}_phase-{self.phase}'
             self.session.tracker.sendMessage(msg)
             # Should be log more to the eyetracker? Like 'parameters'?
@@ -160,10 +167,10 @@ class Trial:
                 for param, val in self.parameters.items():
                     self.session.global_log.loc[idx, param] = val
 
-                if self.has_tracker:  # send msg to eyetracker
+                if self.eyetracker_on:  # send msg to eyetracker
                     msg = f'start_type-{event_type}_trial-{self.trial_nr}_phase-{self.phase}_key-{key}_time-{t}'
                     self.session.tracker.sendMessage(msg)
-        
+
                 #self.trial_log['response_key'][self.phase].append(key)
                 #self.trial_log['response_onset'][self.phase].append(t)
                 #self.trial_log['response_time'][self.phase].append(t - self.start_trial)
@@ -183,16 +190,11 @@ class Trial:
         """
         self.draw()  # draw this phase, then load
         self.session.win.flip()
-
+        
         load_start = self.session.clock.getTime()
-        try:
-            self.session.create_trial(self.trial_nr+1)
-        except Exception as err:  # not quite happy about this try/except part ...
-            logging.warn('Cannot create trial - probably at last one '
-                            f'(trial {self.trial_nr})!')
-            print(err)
-
+        self.session.create_trial(self.trial_nr+1)  # call create_trial method from session!
         load_dur = self.session.clock.getTime() - load_start
+    
         if self.timing == 'frames':
             load_dur /= self.session.actual_framerate
 
@@ -204,7 +206,7 @@ class Trial:
         """ Runs through phases. Should not be subclassed unless
         really necessary. """
 
-        if self.has_tracker:  # Sets status message
+        if self.eyetracker_on:  # Sets status message
             cmd = f"record_status_message 'trial {self.trial_nr}'"
             self.session.tracker.sendCommand(cmd)
 
