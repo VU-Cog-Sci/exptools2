@@ -403,9 +403,17 @@ The package is not yet pip-installable. To install it, clone the repository (`gi
 
 - `psychopy>=3.0.5`
 - `pyyaml`
+- `pyglet==1.3.2`
 - `pandas>=0.23.0`
 - `numpy>=1.14`
 - `msgpack_numpy`
 - `matplotlib`
 
 If you want to use the eytracker functionality with Eyelink eyetrackers, you also need the `pylink` package (for Python3!) from SR Research. This is not yet publicly available; if you need it, send Lukas an email.
+
+## Troubleshooting the installation
+*You're getting a `pyglet` error when `exptools2` tries to initialize a Window.*
+This is a weird bug caused when installing a `pyglet` version > 1.3.2. Uninstall `pyglet` and install version 1.3.2. specifically (`pip install pyglet==1.3.2`).
+
+*You're getting a `pylink` error when `exptools2` tries to initialize the Eyelink eyetracker.*
+Did you install the `pylink` library (for Python 3.6)? Note that this is not yet publicly available, but Lukas has beta builds (for Windows/Mac/Linux) available, so send him an email if you need this. Another issue could be that you're using Python 3.7, which is not compatible with the `pylink` package (yet).
