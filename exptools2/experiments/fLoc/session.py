@@ -63,7 +63,7 @@ class FLocSession(Session):
         sub_id = f'sub-{sub}'
         self.stim_df = df.query('sub_id == @sub_id & run == @run')
         
-        if self.ntrials is not None:
+        if self.ntrials is not None:  # just for debugging
             self.stim_df = self.stim_df.iloc[:self.ntrials, :]
 
         self.stim_df.index = np.arange(0, len(self.stim_df), dtype=int)
@@ -84,6 +84,11 @@ class FLocSession(Session):
 
     def create_trial(self, trial_nr):
         
+        if trial_nr == (self.stim_df.shape[0] - 1):  # last trial!
+            load_next_during_phase = None
+        else:
+            load_next_during_phase = 1
+
         stim_type = self.stim_df.loc[trial_nr, 'trial_type']
         stim_name = self.stim_df.loc[trial_nr, 'stim_name']
         task_probe = self.stim_df.loc[trial_nr, 'task_probe']
@@ -94,7 +99,7 @@ class FLocSession(Session):
             phase_durations=(0.4, 0.1),
             phase_names=(stim_type, 'ISI'),
             pic=stim_name,
-            load_next_during_phase=1,
+            load_next_during_phase=load_next_during_phase,
             verbose=True,
             timing='seconds',
             parameters={'trial_type': self.type2condition[stim_type],
@@ -102,14 +107,17 @@ class FLocSession(Session):
         )
 
         self.trials.append(trial)
-        self.current_trial = trial
 
     def run(self):
         """ Runs experiment. """
 
         watching_response = False
         self.create_trial(trial_nr=0)
-        self.display_text('Waiting for scanner', keys=self.settings['mri'].get('sync', 't'))
+        txt = ('Deze run duurt ongeveer 5 minutes.\n\n'
+               'Als je precies hetzelfde plaatje twee keer achter elkaar ziet\n'
+               'druk dan met je rechter wijsvinger op de knop.\n\n'
+               'Blijf zo stil mogelijk liggen tijdens (en na) de scan!')
+        self.display_text(txt, keys=self.settings['mri'].get('sync', 't'), height=0.5)
         self.start_experiment(wait_n_triggers=self.dummies)
 
         hits = []
@@ -119,7 +127,7 @@ class FLocSession(Session):
                 watching_response = True
                 onset_watching_response = self.clock.getTime()
 
-            self.current_trial.run()
+            self.trials[trial_nr].run()
 
             if watching_response:
 
