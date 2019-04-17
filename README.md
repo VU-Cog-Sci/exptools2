@@ -298,12 +298,12 @@ class StroopSession(Session):
 Setting the `verbose` argument to `True` prints a bunch of stuff to the terminal while running your experiment (such as timing/onset of phases/trials) which may be nice during testing/debugging your experiment. As printing to `stdout` takes non-trivial amount of time, set this parameter to `False` when you're running your experiment for real.
 
 ### The `load_during_next` argument (ADVANCED)
-This option (default `None`) is quite "advanced". It allows you to specify a particular phase during which `exptools2` should load the next trial. This option is useful when you don't want to initialize all trials before running your trial-loop, for example when this would take very long time (e.g., when loading thousands of images in a rapid visual processing experiment). When using this method, your session class should have a method called `create_trial` with a single argument reflecting the index of the trial that should be loaded. You are responsible of making sure that, given a particular trial-index, the correct trial will be loaded. To "load" a trial, you could set it to an attribute of your session, e.g., `current_trial`:
+This option (default `None`) is quite "advanced". It allows you to specify a particular phase during which `exptools2` should load the next trial. This option is useful when you don't want to initialize all trials before running your trial-loop, for example when this would take very long time (e.g., when loading thousands of images in a rapid visual processing experiment). When using this method, your session class should have a method called `create_trial` with a single argument reflecting the index of the trial that should be loaded. You are responsible of making sure that, given a particular trial-index, the correct trial will be loaded. To "load" a trial, you could append it to a list of trials, e.g., `self.trials`:
 
 ```python
 
 class SessionWithManyImages(Session):
-
+    # assume that self.trials = [] is created upon initialization
     def create_trial(self, trial_nr):
         trial = YourTrials(
             session=session,
@@ -311,12 +311,12 @@ class SessionWithManyImages(Session):
             phase_durations=(1, 1),
             load_during_next=1  # load next trial during phase 1
         )
-        self.current_trial = trial
+        self.trials.append(trial)
         
     def run(self):
         self.create_trial(trial_nr=0)  # set first trial
         for i in range(10):  # assuming that there are 10 trials
-            self.current_trial.run()
+            self.trials[i].run()
 ```
 
 ### Overview: a complete experiment
