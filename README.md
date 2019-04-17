@@ -397,6 +397,8 @@ if __name__ == '__main__':
 TBD
 
 ## Installation instructions
+The `exptools2` package assumes Python version 3.6 or higher. Note that using the eyetracker-functionality, which depends on the `pylink` package, *only* works with Python 3.6 (*not* >3.6) because `pylink` only supports Python 3.6 at the moment.
+
 The package is not yet pip-installable. To install it, clone the repository (`git clone https://github.com/VU-Cog-Sci/exptools2.git`) and install the package (`python setup.py install`). The package assumes that the following dependencies are installed:
 
 - `psychopy>=3.0.5`
