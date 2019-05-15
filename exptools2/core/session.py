@@ -73,8 +73,8 @@ class Session:
         self.mouse = Mouse(**self.settings['mouse'])
         self.logfile = self._create_logfile()
         self.default_fix = create_circle_fixation(self.win, radius=0.075, color=(1, 1, 1))
-        self.mri_trigger = None
-        self.mri_simulator = self._setup_mri_simulator() if self.settings['mri']['simulate'] else None
+        self.mri_trigger = None  # is set below
+        self.mri_simulator = self._setup_mri()
 
     def _load_settings(self):
         """ Loads settings and sets preferences. """
@@ -136,12 +136,15 @@ class Session:
         log_path = op.join(self.output_dir, self.output_str + '_log.txt')
         return logging.LogFile(f=log_path, filemode='w', level=logging.EXP) 
 
-    def _setup_mri_simulator(self):
-        """ Initializes an MRI simulator (if 'mri' in settings). """
+    def _setup_mri(self):
+        """ Initializes an MRI simulator """
         args = self.settings['mri'].copy()
-        args.pop('simulate')
         self.mri_trigger = self.settings['mri']['sync']
-        return SyncGenerator(**args)
+        if args['simulate']:
+            args.pop('simulate')
+            return SyncGenerator(**args)
+        else:
+            return None
 
     def start_experiment(self, wait_n_triggers=None,
                          show_fix_during_dummies=True):

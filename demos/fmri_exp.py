@@ -10,10 +10,11 @@ class TestFMRISession(TestSession):
         self.display_text('Waiting for scanner', keys=self.settings['mri'].get('sync', 't'))
         # ^ only real difference with simple_exp
 
-        self.start_experiment(wait_n_triggers=4)
+        self.start_experiment()
 
         for trial in self.trials:
             trial.run()
+            print(trial.last_resp)
 
         self.close()
 

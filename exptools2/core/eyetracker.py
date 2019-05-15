@@ -7,6 +7,7 @@ from psychopy import misc
 from psychopy import event
 from psychopy.sound import Sound
 from psychopy.visual import TextStim, Circle
+from psychopy import visual, sound
 
 from .session import Session
 from .trial import Trial
@@ -231,7 +232,6 @@ if PYLINK_AVAILABLE:  # super ugly, but don't know an elegant fix atm
         def record_abort_hide(self):
             pass
 
-
         def setup_image_display(self, width, height):
 
             self.size = (width / 2, height / 2)
@@ -335,7 +335,6 @@ if PYLINK_AVAILABLE:  # super ugly, but don't know an elegant fix atm
 
 
     class Psychocal(pylink.EyeLinkCustomDisplay):
-    
         def __init__(self, w, h, tracker, window):
             pylink.EyeLinkCustomDisplay.__init__(self)
             self.sres = (w, h)
@@ -348,7 +347,7 @@ if PYLINK_AVAILABLE:  # super ugly, but don't know an elegant fix atm
             # Define stimuli
             self.backcolor = window.color
             if sum(window.color) != 0:
-                tcolout = -(window.color)
+                tcolout = -1#-(window.color)
             else:
                 tcolout = -1
             self.txtcol = tcolout
@@ -358,14 +357,14 @@ if PYLINK_AVAILABLE:  # super ugly, but don't know an elegant fix atm
                                         lineColor=tcolout, units='pix')
 
             self.targetin = visual.Circle(self.window, pos=(0, 0), radius=3,
-                                        fillColor=window.color,
-                                        lineColor=window.color,
+                                        fillColor=0,
+                                        lineColor=0,
                                         units='pix')
 
             # Set up sounds
-            self.__target_beep__ = sound.Sound(800, secs=.1)
-            self.__target_beep__done__ = sound.Sound(1200, secs=.1)
-            self.__target_beep__error__ = sound.Sound(400, secs=.1)
+            #self.__target_beep__ = sound.Sound(800, secs=.1)
+            #self.__target_beep__done__ = sound.Sound(1200, secs=.1)
+            #self.__target_beep__error__ = sound.Sound(400, secs=.1)
 
             # Image drawing variables (used later)
             self.rgb_index_array = None
