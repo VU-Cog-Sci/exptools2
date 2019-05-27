@@ -6,8 +6,8 @@ The `exptools` Python package provides a way to easily and quickly create (psych
 ## Installation using conda
 The latest master branch on github can be installed by creating a [conda](https://docs.conda.io/projects/conda/en/latest/index.html) environment using the following commands:
 ```
-conda create -n psypy3 python=3.6
-conda activate psypy3
+conda create -n exptools2 python=3.6
+conda activate exptools2
 conda install numpy scipy matplotlib pandas pyopengl pillow lxml openpyxl xlrd configobj pyyaml gevent greenlet msgpack-python psutil pytables requests[security] cffi seaborn wxpython cython pyzmq pyserial qt pyqt
 conda install -c conda-forge pyglet pysoundfile python-bidi moviepy pyosf
 pip install zmq json-tricks pyparallel sounddevice pygame pysoundcard psychopy_ext psychopy
@@ -15,6 +15,12 @@ pip install git+https://github.com/VU-Cog-Sci/exptools2/
 ```
 
 For using the eyetracker, you also need to install `pylink`.
+
+If you want to run a `exptools2`-script, you now should always start by activating the `exptool2`-conda environment. This is done in a shell by typing:
+```
+conda activate exptools2
+```
+
 
 
 ## Manual installation
