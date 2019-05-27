@@ -1,6 +1,52 @@
 # exptools2
 The `exptools` Python package provides a way to easily and quickly create (psychophysics) experiments with accurate ("non-slip") timing. It is basically a wrapper around [Psychopy](https://www.psychopy.org/) which automates the boring but important parts of building experiments (such as stimulus timing and logging), while maintaining the flexibility of Psychopy in terms of how you want to present your stimuli and run your experiment. 
 
+
+# Installation instructions
+## Installation using conda
+The latest master branch on github can be installed by creating a [conda](https://docs.conda.io/projects/conda/en/latest/index.html) environment using the following commands:
+```
+conda create -n exptools2 python=3.6
+conda activate exptools2
+conda install numpy scipy matplotlib pandas pyopengl pillow lxml openpyxl xlrd configobj pyyaml gevent greenlet msgpack-python psutil pytables requests[security] cffi seaborn wxpython cython pyzmq pyserial qt pyqt
+conda install -c conda-forge pyglet pysoundfile python-bidi moviepy pyosf
+pip install zmq json-tricks pyparallel sounddevice pygame pysoundcard psychopy_ext psychopy
+pip install git+https://github.com/VU-Cog-Sci/exptools2/
+```
+
+For using the eyetracker, you also need to install `pylink`.
+
+If you want to run a `exptools2`-script, you now should always start by activating the `exptool2`-conda environment. This is done in a shell by typing:
+```
+conda activate exptools2
+```
+
+
+
+## Manual installation
+The `exptools2` package assumes Python version 3.6 or higher. Note that using the eyetracker-functionality, which depends on the `pylink` package, *only* works with Python 3.6 (*not* >3.6) because `pylink` only supports Python 3.6 at the moment.
+
+
+The package is not yet pip-installable. To install it, clone the repository (`git clone https://github.com/VU-Cog-Sci/exptools2.git`) and install the package (`python setup.py install`). The package assumes that the following dependencies are installed:
+
+- `psychopy>=3.0.5`
+- `pyyaml`
+- `pyglet==1.3.2`
+- `pandas>=0.23.0`
+- `numpy>=1.14`
+- `msgpack_numpy`
+- `matplotlib`
+
+If you want to use the eytracker functionality with Eyelink eyetrackers, you also need the `pylink` package (for Python3!) from SR Research. This is not yet publicly available; if you need it, send Lukas an email.
+
+## Troubleshooting the installation
+*You're getting a `pyglet` error when `exptools2` tries to initialize a Window.*
+This is a weird bug caused when installing a `pyglet` version > 1.3.2. Uninstall `pyglet` and install version 1.3.2. specifically (`pip install pyglet==1.3.2`).
+
+*You're getting a `pylink` error when `exptools2` tries to initialize the Eyelink eyetracker.*
+Did you install the `pylink` library (for Python 3.6)? Note that this is not yet publicly available, but Lukas has beta builds (for Windows/Mac/Linux) available, so send him an email if you need this. Another issue could be that you're using Python 3.7, which is not compatible with the `pylink` package (yet).
+
+# Usage
 ## How does it work?
 The package assumes that your experiment (or *session*) consists of a predetermined number of *trials*, which may in turn consist of a number of *phases*. For example, in a Stroop-experiment, a session may consist of 100 trials, which consist of two phases: a phase in which the stimulus (usually the word for a color, like "red", in a particular color) is shown, and another phase (the "interstimulus interval", ISI) in which a fixation dot is shown. Usually, you want your trials, and their phases, to have a predetermined onset and duration. This is especially relevant in studies in which concurrent fMRI, EEG/MEG, or eye gaze/pupil size is recorded. In `exptools2`, dedicated classes for functionality related to your session (the `Session` class) and your trials (the `Trial` class) are provided. Below, we explain these two classes in more detail.
 
@@ -395,25 +441,3 @@ if __name__ == '__main__':
 
 ### The `PylinkEyetrackerSession` class
 TBD
-
-## Installation instructions
-The `exptools2` package assumes Python version 3.6 or higher. Note that using the eyetracker-functionality, which depends on the `pylink` package, *only* works with Python 3.6 (*not* >3.6) because `pylink` only supports Python 3.6 at the moment.
-
-The package is not yet pip-installable. To install it, clone the repository (`git clone https://github.com/VU-Cog-Sci/exptools2.git`) and install the package (`python setup.py install`). The package assumes that the following dependencies are installed:
-
-- `psychopy>=3.0.5`
-- `pyyaml`
-- `pyglet==1.3.2`
-- `pandas>=0.23.0`
-- `numpy>=1.14`
-- `msgpack_numpy`
-- `matplotlib`
-
-If you want to use the eytracker functionality with Eyelink eyetrackers, you also need the `pylink` package (for Python3!) from SR Research. This is not yet publicly available; if you need it, send Lukas an email.
-
-## Troubleshooting the installation
-*You're getting a `pyglet` error when `exptools2` tries to initialize a Window.*
-This is a weird bug caused when installing a `pyglet` version > 1.3.2. Uninstall `pyglet` and install version 1.3.2. specifically (`pip install pyglet==1.3.2`).
-
-*You're getting a `pylink` error when `exptools2` tries to initialize the Eyelink eyetracker.*
-Did you install the `pylink` library (for Python 3.6)? Note that this is not yet publicly available, but Lukas has beta builds (for Windows/Mac/Linux) available, so send him an email if you need this. Another issue could be that you're using Python 3.7, which is not compatible with the `pylink` package (yet).
