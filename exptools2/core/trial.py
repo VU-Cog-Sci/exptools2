@@ -179,6 +179,8 @@ class Trial:
                     self.last_resp = key
                     self.last_resp_onset = t
 
+        return events
+
     def load_next_trial(self, phase_dur):
         """ Loads the next trial by calling the session's
         'create_trial' method.
