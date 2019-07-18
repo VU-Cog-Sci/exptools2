@@ -5,12 +5,12 @@ from datetime import datetime
 from psychopy import core
 from psychopy import misc
 from psychopy import event
-from psychopy.sound import Sound
 from psychopy.visual import TextStim, Circle
 from psychopy import visual, sound
 
 from .session import Session
 from .trial import Trial
+
 
 try:
     import pylink
@@ -136,10 +136,10 @@ if PYLINK_AVAILABLE:  # super ugly, but don't know an elegant fix atm
             self.win = win
             self.settings = settings  # from session
             self.txtcol = -1
-            self.__target_beep__ = Sound(800, secs=.1)
-            self.__target_beep__done__ = Sound(1200, secs=.1)
-            self.__target_beep__error__ = Sound(400, secs=.1)
-            #self.backcolor = self.win.color
+            #self.__target_beep__ = sound.Sound(800, secs=.1)  # THIS WILL GIVE A SEGFAULT!
+            #self.__target_beep__done__ = sound.Sound(1200, secs=.1)  # THIS WILL GIVE A SEGFAULT!
+            #self.__target_beep__error__ = sound.Sound(400, secs=.1)  # THIS WILL GIVE A SEGFAULT!
+            self.backcolor = self.win.color
 
             dot_size_pix = misc.deg2pix(self.settings['eyetracker'].get('dot_size'),
                                         self.win.monitor)
