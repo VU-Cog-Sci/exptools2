@@ -144,7 +144,7 @@ class Trial:
         self.exit_phase = True
 
     def stop_trial(self):
-        """ Allows you to break out of the trial while it hot completely finished """
+        """ Allows you to break out of the trial while not completely finished """
         self.exit_trial = True
 
     def get_events(self):
