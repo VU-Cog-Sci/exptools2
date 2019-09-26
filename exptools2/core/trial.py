@@ -59,6 +59,7 @@ class Trial:
 
         self.start_trial = None
         self.exit_phase = False
+        self.exit_trial = False
         self.n_phase = len(phase_durations)
         self.phase = 0
         self.last_resp = None
@@ -141,6 +142,10 @@ class Trial:
         """ Allows you to break out the drawing loop while the phase-duration
         has not completely passed (e.g., when a user pressed a button). """
         self.exit_phase = True
+
+    def stop_trial(self):
+        """ Allows you to break out of the trial while it hot completely finished """
+        self.exit_trial = True
 
     def get_events(self):
         """ Logs responses/triggers """
@@ -233,7 +238,7 @@ class Trial:
             if self.timing == 'seconds':
                 # Loop until timer is at 0!
                 self.session.timer.add(phase_dur)
-                while self.session.timer.getTime() < 0 and not self.exit_phase:
+                while self.session.timer.getTime() < 0 and not self.exit_phase and not self.exit_trial:
                     self.draw()
                     self.session.win.flip()
                     self.get_events()
@@ -244,7 +249,7 @@ class Trial:
                 # dropping frames
                 for _ in range(phase_dur):
 
-                    if self.exit_phase:
+                    if self.exit_phase or self.exit_trial:
                         break
 
                     self.draw()
@@ -255,5 +260,8 @@ class Trial:
             if self.exit_phase:  # broke out of phase loop
                 self.session.timer.reset()  # reset timer!
                 self.exit_phase = False  # reset exit_phase
+            if self.exit_trial:
+                self.session.timer.reset()
+                break
 
             self.phase += 1  # advance phase
