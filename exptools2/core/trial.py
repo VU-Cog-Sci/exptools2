@@ -100,24 +100,33 @@ class Trial:
         """ Should be implemented in child Class. """
         raise NotImplementedError
 
-    def log_phase_info(self):
+    def log_phase_info(self, phase=None):
         """ Method passed to win.callonFlip, such that the
-        onsets get logged *exactly* on the screen flip. """
+        onsets get logged *exactly* on the screen flip.
+
+        Phase can be passed as an argument to log the onsets
+        of phases that finish before a window flip (e.g.,
+        phases with duration = 0, and are skipped on some
+        trials).
+        """
         onset = self.session.clock.getTime()
 
-        if self.phase == 0:
+        if phase is None:
+            phase = self.phase
+
+        if phase == 0:
             self.start_trial = onset
 
             if self.verbose:
                 print(f'Starting trial {self.trial_nr}')
 
-        msg = f"\tPhase {self.phase} start: {onset:.5f}"
+        msg = f"\tPhase {phase} start: {onset:.5f}"
 
         if self.verbose:
             print(msg)
 
         if self.eyetracker_on:  # send msg to eyetracker
-            msg = f'start_type-stim_trial-{self.trial_nr}_phase-{self.phase}'
+            msg = f'start_type-stim_trial-{self.trial_nr}_phase-{phase}'
             self.session.tracker.sendMessage(msg)
             # Should be log more to the eyetracker? Like 'parameters'?
 
@@ -125,8 +134,8 @@ class Trial:
         idx = self.session.global_log.shape[0]
         self.session.global_log.loc[idx, 'onset'] = onset
         self.session.global_log.loc[idx, 'trial_nr'] = self.trial_nr
-        self.session.global_log.loc[idx, 'event_type'] = self.phase_names[self.phase]
-        self.session.global_log.loc[idx, 'phase'] = self.phase
+        self.session.global_log.loc[idx, 'event_type'] = self.phase_names[phase]
+        self.session.global_log.loc[idx, 'phase'] = phase
         self.session.global_log.loc[idx, 'nr_frames'] = self.session.nr_frames
 
         for param, val in self.parameters.items():  # add parameters to log
@@ -229,7 +238,8 @@ class Trial:
             self.session.first_trial = False
 
         for phase_dur in self.phase_durations:  # loop over phase durations
-            self.session.win.callOnFlip(self.log_phase_info)
+            # pass self.phase *now* instead of while logging the phase info.
+            self.session.win.callOnFlip(self.log_phase_info, phase=self.phase)
 
             # Start loading in next trial during this phase (if not None)
             if self.load_next_during_phase == self.phase:
