@@ -59,6 +59,7 @@ class Trial:
 
         self.start_trial = None
         self.exit_phase = False
+        self.exit_trial = False
         self.n_phase = len(phase_durations)
         self.phase = 0
         self.last_resp = None
@@ -99,24 +100,33 @@ class Trial:
         """ Should be implemented in child Class. """
         raise NotImplementedError
 
-    def log_phase_info(self):
+    def log_phase_info(self, phase=None):
         """ Method passed to win.callonFlip, such that the
-        onsets get logged *exactly* on the screen flip. """
+        onsets get logged *exactly* on the screen flip.
+
+        Phase can be passed as an argument to log the onsets
+        of phases that finish before a window flip (e.g.,
+        phases with duration = 0, and are skipped on some
+        trials).
+        """
         onset = self.session.clock.getTime()
 
-        if self.phase == 0:
+        if phase is None:
+            phase = self.phase
+
+        if phase == 0:
             self.start_trial = onset
 
             if self.verbose:
                 print(f'Starting trial {self.trial_nr}')
 
-        msg = f"\tPhase {self.phase} start: {onset:.5f}"
+        msg = f"\tPhase {phase} start: {onset:.5f}"
 
         if self.verbose:
             print(msg)
 
         if self.eyetracker_on:  # send msg to eyetracker
-            msg = f'start_type-stim_trial-{self.trial_nr}_phase-{self.phase}'
+            msg = f'start_type-stim_trial-{self.trial_nr}_phase-{phase}'
             self.session.tracker.sendMessage(msg)
             # Should be log more to the eyetracker? Like 'parameters'?
 
@@ -124,8 +134,8 @@ class Trial:
         idx = self.session.global_log.shape[0]
         self.session.global_log.loc[idx, 'onset'] = onset
         self.session.global_log.loc[idx, 'trial_nr'] = self.trial_nr
-        self.session.global_log.loc[idx, 'event_type'] = self.phase_names[self.phase]
-        self.session.global_log.loc[idx, 'phase'] = self.phase
+        self.session.global_log.loc[idx, 'event_type'] = self.phase_names[phase]
+        self.session.global_log.loc[idx, 'phase'] = phase
         self.session.global_log.loc[idx, 'nr_frames'] = self.session.nr_frames
 
         for param, val in self.parameters.items():  # add parameters to log
@@ -141,6 +151,10 @@ class Trial:
         """ Allows you to break out the drawing loop while the phase-duration
         has not completely passed (e.g., when a user pressed a button). """
         self.exit_phase = True
+
+    def stop_trial(self):
+        """ Allows you to break out of the trial while not completely finished """
+        self.exit_trial = True
 
     def get_events(self):
         """ Logs responses/triggers """
@@ -224,7 +238,8 @@ class Trial:
             self.session.first_trial = False
 
         for phase_dur in self.phase_durations:  # loop over phase durations
-            self.session.win.callOnFlip(self.log_phase_info)
+            # pass self.phase *now* instead of while logging the phase info.
+            self.session.win.callOnFlip(self.log_phase_info, phase=self.phase)
 
             # Start loading in next trial during this phase (if not None)
             if self.load_next_during_phase == self.phase:
@@ -233,7 +248,7 @@ class Trial:
             if self.timing == 'seconds':
                 # Loop until timer is at 0!
                 self.session.timer.add(phase_dur)
-                while self.session.timer.getTime() < 0 and not self.exit_phase:
+                while self.session.timer.getTime() < 0 and not self.exit_phase and not self.exit_trial:
                     self.draw()
                     self.session.win.flip()
                     self.get_events()
@@ -244,7 +259,7 @@ class Trial:
                 # dropping frames
                 for _ in range(phase_dur):
 
-                    if self.exit_phase:
+                    if self.exit_phase or self.exit_trial:
                         break
 
                     self.draw()
@@ -255,5 +270,8 @@ class Trial:
             if self.exit_phase:  # broke out of phase loop
                 self.session.timer.reset()  # reset timer!
                 self.exit_phase = False  # reset exit_phase
+            if self.exit_trial:
+                self.session.timer.reset()
+                break
 
             self.phase += 1  # advance phase
