@@ -80,7 +80,7 @@ class Session:
         """ Loads settings and sets preferences. """
         default_settings_path = op.join(op.dirname(op.dirname(__file__)),
                                         'data', 'default_settings.yml')
-        with open(default_settings_path, 'r') as f_in:
+        with open(default_settings_path, 'r', encoding='utf8') as f_in:
             default_settings = yaml.safe_load(f_in)
 
         if self.settings_file is None:
