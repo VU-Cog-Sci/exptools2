@@ -21,7 +21,11 @@ If you want to run a `exptools2`-script, you now should always start by activati
 conda activate exptools2
 ```
 
-
+If you encounter this error in Windows: "error: command 'swig.exe' failed: No such file or directory", you should install pywinhook. This can be done in a shell by typing:
+```
+conda install -c conda-forge pywinhook
+```
+Then you can re-run the failed command.
 
 ## Manual installation
 The `exptools2` package assumes Python version 3.6 or higher. Note that using the eyetracker-functionality, which depends on the `pylink` package, *only* works with Python 3.6 (*not* >3.6) because `pylink` only supports Python 3.6 at the moment.
