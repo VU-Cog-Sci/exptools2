@@ -182,8 +182,14 @@ class Trial:
                 self.session.global_log.loc[idx, 'phase'] = self.phase
                 self.session.global_log.loc[idx, 'response'] = key
 
-                for param, val in self.parameters.items():
-                    self.session.global_log.loc[idx, param] = val
+                # for param, val in self.parameters.items():
+                    # self.session.global_log.loc[idx, param] = val
+                for param, val in self.parameters.items():  # add parameters to log
+                    if type(val) == np.ndarray or type(val) == list:
+                        for i, x in enumerate(val):
+                            self.session.global_log.loc[idx, param+'_%4i'%i] = x 
+                    else:       
+                        self.session.global_log.loc[idx, param] = val
 
                 if self.eyetracker_on:  # send msg to eyetracker
                     msg = f'start_type-{event_type}_trial-{self.trial_nr}_phase-{self.phase}_key-{key}_time-{t}'

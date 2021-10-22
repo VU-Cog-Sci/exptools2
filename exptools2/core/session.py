@@ -264,8 +264,8 @@ class Session:
         ax.axhline(1./self.actual_framerate, c='r')
         ax.axhline(1./self.actual_framerate + 1./self.actual_framerate, c='r', ls='--')
         ax.set(xlim=(0, len(self.win.frameIntervals) + 1), xlabel='Frame nr', ylabel='Interval (sec.)',
-               ylim=(-0.1, 0.5))
-        fig.savefig(op.join(self.output_dir, self.output_str + '_frames.png'))
+               ylim=(-0.01, 0.125))
+        fig.savefig(op.join(self.output_dir, self.output_str + '_frames.pdf'))
 
         if self.mri_simulator is not None:
             self.mri_simulator.stop()
