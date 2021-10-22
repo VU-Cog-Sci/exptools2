@@ -139,7 +139,11 @@ class Trial:
         self.session.global_log.loc[idx, 'nr_frames'] = self.session.nr_frames
 
         for param, val in self.parameters.items():  # add parameters to log
-            self.session.global_log.loc[idx, param] = val
+            if type(val) == np.ndarray or type(val) == list:
+                for i, x in enumerate(val):
+                    self.session.global_log.loc[idx, param+'_%4i'%i] = x 
+            else:       
+                self.session.global_log.loc[idx, param] = val
 
         # add to trial_log
         #idx = self.trial_log.shape[0]
