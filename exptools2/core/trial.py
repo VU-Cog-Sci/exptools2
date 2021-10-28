@@ -13,7 +13,7 @@ class Trial:
 
     def __init__(self, session, trial_nr, phase_durations, phase_names=None,
                  parameters=None, timing='seconds', load_next_during_phase=None,
-                 verbose=True):
+                 verbose=True, draw_each_frame=True):
         """ Initializes Trial objects.
 
         parameters
@@ -37,6 +37,8 @@ class Trial:
             If not None, the next trial will be loaded during this phase
         verbose : bool
             Whether to print extra output (mostly timing info)
+        draw_each_frame : bool
+            Whether to draw on each frame, or let the draw function decide when to flip the buffers.
 
         attributes
         ----------
@@ -56,6 +58,7 @@ class Trial:
         self.timing = timing
         self.load_next_during_phase = load_next_during_phase
         self.verbose = verbose
+        self.draw_each_frame = draw_each_frame
 
         self.start_trial = None
         self.exit_phase = False
@@ -260,9 +263,10 @@ class Trial:
                 self.session.timer.add(phase_dur)
                 while self.session.timer.getTime() < 0 and not self.exit_phase and not self.exit_trial:
                     self.draw()
-                    self.session.win.flip()
+                    if self.draw_each_frame:
+                        self.session.win.flip()
+                        self.session.nr_frames += 1
                     self.get_events()
-                    self.session.nr_frames += 1
             else:
                 # Loop for a predetermined number of frames
                 # Note: only works when you're sure you're not 
