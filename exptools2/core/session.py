@@ -90,7 +90,7 @@ class Session:
             if not op.isfile(self.settings_file):
                 raise IOError(f"Settings-file {self.settings_file} does not exist!")
 
-            with open(self.settings_file, 'r') as f_in:
+            with open(self.settings_file, 'r', encoding='utf8') as f_in:
                 user_settings = yaml.safe_load(f_in)
             
             # Update (and potentially overwrite) default settings
