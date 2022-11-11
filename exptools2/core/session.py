@@ -150,9 +150,8 @@ class Session:
         win.flip(clearBuffer=True)
         self.actual_framerate = win.getActualFrameRate()
         if self.actual_framerate is None:
-            logging.warn("framerate not measured, substituting 60 by default")
-            self.actual_framerate = 60.0
-        t_per_frame = 1.0 / self.actual_framerate
+            self.actual_framerate = 1. / win.monitorFramePeriod
+            t_per_frame = 1.0 / self.actual_framerate
 
         logging.warn(
             f"Actual framerate: {self.actual_framerate:.5f} "
