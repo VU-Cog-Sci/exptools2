@@ -13,8 +13,6 @@ from psychopy.event import waitKeys, Mouse
 from psychopy.monitors import Monitor
 from psychopy import logging
 from psychopy import prefs as psychopy_prefs
-
-
 from ..stimuli import create_circle_fixation
 
 
@@ -130,6 +128,7 @@ class Session:
             logging.warn("framerate not measured, substituting 60 by default")
             self.actual_framerate = 60.0
         t_per_frame = 1. / self.actual_framerate
+        
         logging.warn(f"Actual framerate: {self.actual_framerate:.5f} "
                      f"(1 frame = {t_per_frame:.5f})")
         return win
@@ -247,11 +246,10 @@ class Session:
         last_phase_onset = self.global_log.loc[nonresp_idx, 'onset'].iloc[-1]
         dur_last_phase = self.exp_stop - last_phase_onset 
         durations = np.append(self.global_log.loc[nonresp_idx, 'onset'].diff().values[1:], dur_last_phase)
-        self.global_log.loc[nonresp_idx, 'duration'] = durations
-        
+
         # Same for nr frames
         nr_frames = np.append(self.global_log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
-        self.global_log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(int)
+        self.global_log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(np.float).astype(np.float32)
 
         # Round for readability and save to disk
         self.global_log = self.global_log.round({'onset': 5, 'onset_abs': 5, 'duration': 5})
