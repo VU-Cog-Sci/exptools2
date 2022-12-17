@@ -144,7 +144,7 @@ class Trial:
         for param, val in self.parameters.items():  # add parameters to log
             if type(val) == np.ndarray or type(val) == list:
                 for i, x in enumerate(val):
-                    self.session.global_log.loc[idx, param+'_%4i'%i] = x 
+                    self.session.global_log.loc[idx, param+'_%4i'%i] = str(x) 
             else:       
                 self.session.global_log.loc[idx, param] = val
 
