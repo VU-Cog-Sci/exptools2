@@ -246,7 +246,8 @@ class Session:
         last_phase_onset = self.global_log.loc[nonresp_idx, 'onset'].iloc[-1]
         dur_last_phase = self.exp_stop - last_phase_onset 
         durations = np.append(self.global_log.loc[nonresp_idx, 'onset'].diff().values[1:], dur_last_phase)
-
+        self.global_log.loc[nonresp_idx, 'duration'] = durations
+        
         # Same for nr frames
         nr_frames = np.append(self.global_log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
         self.global_log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(np.float).astype(np.float32)
