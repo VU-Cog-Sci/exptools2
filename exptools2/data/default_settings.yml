@@ -24,7 +24,6 @@ eyetracker:
   address: '100.1.1.1'
   dot_size: 0.1  # in deg
   options:
-    active_eye: left  # [right]
     binocular_enabled: NO  # [YES]
     heuristic_filter: 2  # [0, OFF, 1, ON]
     pupil_size_diameter: YES  # [NO]
