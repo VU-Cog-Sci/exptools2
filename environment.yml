@@ -3,14 +3,16 @@ name: exp
 channels:
   - defaults
   - conda-forge
+  - anaconda
 
 dependencies:
-  - python=3.9
+  - python=3.10
   - mamba
   - ipython
   - matplotlib
   - pandas
   - scikit-learn
+  - scikit-image
   - numpy
   - pandas
   - pyopengl
@@ -27,7 +29,7 @@ dependencies:
   - requests
   - cffi
   - seaborn
-  - wxpython
+  - wxpython==4.1.1
   - cython
   - pyzmq
   - pyserial
@@ -38,15 +40,18 @@ dependencies:
   - python-bidi
   - moviepy
   - pyosf
+  - python-sounddevice
+  - portaudio
   - pip
   - pip:
-    - zmq
-    - json-tricks
-    - pyparallel
-    - sounddevice
-    - pygame
-    - pysoundcard
-    - psychopy_ext
+    # - pyaudio
+    # - zmq
+    # - json-tricks
+    # - pyparallel
+    # - sounddevice
+    # - pygame
+    # - pysoundcard
+    # - psychopy_ext
     - psychopy
-    # - git+https://github.com/VU-Cog-Sci/exptools2/
+    - git+https://github.com/VU-Cog-Sci/exptools2/
 

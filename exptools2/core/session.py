@@ -81,7 +81,7 @@ class Session:
         self.monitor = self._create_monitor()
         self.win = self._create_window()
         self.width_deg = 2 * np.degrees(
-            np.atan(self.monitor.getWidth() / self.monitor.getDistance())
+            np.arctan(self.monitor.getWidth() / self.monitor.getDistance())
         )
         self.pix_per_deg = self.win.size[0] / self.width_deg
         self.mouse = Mouse(**self.settings["mouse"])
