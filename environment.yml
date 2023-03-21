@@ -1,0 +1,52 @@
+name: exp
+
+channels:
+  - defaults
+  - conda-forge
+
+dependencies:
+  - python=3.9
+  - mamba
+  - ipython
+  - matplotlib
+  - pandas
+  - scikit-learn
+  - numpy
+  - pandas
+  - pyopengl
+  - pillow
+  - lxml
+  - xlrd
+  - configobj
+  - pyyaml
+  - gevent
+  - greenlet
+  - msgpack-python
+  - psutil
+  - pytables
+  - requests
+  - cffi
+  - seaborn
+  - wxpython
+  - cython
+  - pyzmq
+  - pyserial
+  - qt
+  - pyqt
+  - pyglet
+  - pysoundfile
+  - python-bidi
+  - moviepy
+  - pyosf
+  - pip
+  - pip:
+    - zmq
+    - json-tricks
+    - pyparallel
+    - sounddevice
+    - pygame
+    - pysoundcard
+    - psychopy_ext
+    - psychopy
+    # - git+https://github.com/VU-Cog-Sci/exptools2/
+
