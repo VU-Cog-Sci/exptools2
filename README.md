@@ -6,7 +6,7 @@ The `exptools` Python package provides a way to easily and quickly create (psych
 ## Installation using conda
 The latest master branch on github can be installed by creating a [conda](https://docs.conda.io/projects/conda/en/latest/index.html) environment using the following commands:
 ```
-conda create -n exptools2 python=3.6
+conda create -n exptools2 python=3.9
 conda activate exptools2
 conda install numpy scipy matplotlib pandas pyopengl pillow lxml openpyxl xlrd configobj pyyaml gevent greenlet msgpack-python psutil pytables requests[security] cffi seaborn wxpython cython pyzmq pyserial qt pyqt
 conda install -c conda-forge pyglet pysoundfile python-bidi moviepy pyosf
@@ -21,10 +21,8 @@ If you want to run a `exptools2`-script, you now should always start by activati
 conda activate exptools2
 ```
 
-
-
 ## Manual installation
-The `exptools2` package assumes Python version 3.6 or higher. Note that using the eyetracker-functionality, which depends on the `pylink` package, *only* works with Python 3.6 (*not* >3.6) because `pylink` only supports Python 3.6 at the moment.
+If you have the `EyeLink`-folder from `SRResearch`, you can install `pylink` for various python versions. You can find the wheels in `/usr/share/EyeLink/SampleExperiments/Python/wheels`, which are directly pip-installable for your given python version. 
 
 
 The package is not yet pip-installable. To install it, clone the repository (`git clone https://github.com/VU-Cog-Sci/exptools2.git`) and install the package (`python setup.py install`). The package assumes that the following dependencies are installed:

@@ -13,8 +13,6 @@ from psychopy.event import waitKeys, Mouse
 from psychopy.monitors import Monitor
 from psychopy import logging
 from psychopy import prefs as psychopy_prefs
-
-
 from ..stimuli import create_circle_fixation
 
 
@@ -149,6 +147,7 @@ class Session:
             logging.warn("framerate not measured, substituting 60 by default")
             self.actual_framerate = 60.0
         t_per_frame = 1.0 / self.actual_framerate
+
         logging.warn(
             f"Actual framerate: {self.actual_framerate:.5f} "
             f"(1 frame = {t_per_frame:.5f})"
