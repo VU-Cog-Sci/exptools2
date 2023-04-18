@@ -25,7 +25,7 @@ eyetracker:
   dot_size: 0.1  # in deg
   options:
     binocular_enabled: NO  # [YES]
-    heuristic_filter: 2  # [0, OFF, 1, ON]
+    heuristic_filter: 0  # [0, OFF, 1, ON]
     pupil_size_diameter: YES  # [NO]
     #simulate_head_camera: NO  # [YES]  # GIVES ERROR?
     #simulation_screen_distance
