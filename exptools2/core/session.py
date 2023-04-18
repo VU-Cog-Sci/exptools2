@@ -250,7 +250,7 @@ class Session:
         
         # Same for nr frames
         nr_frames = np.append(self.global_log.loc[nonresp_idx, 'nr_frames'].values[1:], self.nr_frames)
-        self.global_log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(np.float).astype(np.float32)
+        self.global_log.loc[nonresp_idx, 'nr_frames'] = nr_frames.astype(float).astype(float)
 
         # Round for readability and save to disk
         self.global_log = self.global_log.round({'onset': 5, 'onset_abs': 5, 'duration': 5})
