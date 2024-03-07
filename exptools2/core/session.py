@@ -85,6 +85,12 @@ class Session:
         )
         self.pix_per_deg = self.win.size[0] / self.width_deg
         self.mouse = Mouse(**self.settings["mouse"])
+
+        if self.settings['mouse'].get('setup'):
+            self.mouse = Mouse(**self.settings['mouse'])
+        else:
+            self.mouse = None
+
         self.logfile = self._create_logfile()
         self.default_fix = create_circle_fixation(
             self.win, radius=0.075, color=(1, 1, 1)
