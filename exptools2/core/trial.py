@@ -260,7 +260,7 @@ class Trial:
 
             if self.timing == 'seconds':
                 # Loop until timer is at 0!
-                self.session.timer.add(phase_dur)
+                self.session.timer.addTime(-phase_dur)
                 while self.session.timer.getTime() < 0 and not self.exit_phase and not self.exit_trial:
                     self.draw()
                     if self.draw_each_frame:
