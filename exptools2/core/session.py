@@ -149,9 +149,11 @@ class Session:
         win = Window(monitor=self.monitor.name, **self.settings["window"])
         win.flip(clearBuffer=True)
         self.actual_framerate = win.getActualFrameRate()
+
         if self.actual_framerate is None:
             self.actual_framerate = 1. / win.monitorFramePeriod
-            t_per_frame = 1.0 / self.actual_framerate
+
+        t_per_frame = 1.0 / self.actual_framerate
 
         logging.warn(
             f"Actual framerate: {self.actual_framerate:.5f} "
