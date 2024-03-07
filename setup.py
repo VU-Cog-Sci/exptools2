@@ -54,13 +54,7 @@ MICRO = _version_micro
 VERSION = __version__
 PACKAGE_DATA = {'exptools2': [op.join('data', '*')]}
 PACKAGES = find_packages()
-REQUIRES = [
-    'psychopy>=3.0.4',
-    'pyyaml',
-    'pandas>=0.23.0',
-    'numpy>=1.14.3',
-    'msgpack_numpy'
-]
+REQUIRES = None
 
 opts = dict(
     name=NAME,

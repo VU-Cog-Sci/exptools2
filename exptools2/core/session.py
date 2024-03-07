@@ -85,6 +85,12 @@ class Session:
         )
         self.pix_per_deg = self.win.size[0] / self.width_deg
         self.mouse = Mouse(**self.settings["mouse"])
+
+        if self.settings['mouse'].get('setup'):
+            self.mouse = Mouse(**self.settings['mouse'])
+        else:
+            self.mouse = None
+
         self.logfile = self._create_logfile()
         self.default_fix = create_circle_fixation(
             self.win, radius=0.075, color=(1, 1, 1)
@@ -143,9 +149,10 @@ class Session:
         win = Window(monitor=self.monitor.name, **self.settings["window"])
         win.flip(clearBuffer=True)
         self.actual_framerate = win.getActualFrameRate()
+
         if self.actual_framerate is None:
-            logging.warn("framerate not measured, substituting 60 by default")
-            self.actual_framerate = 60.0
+            self.actual_framerate = 1. / win.monitorFramePeriod
+
         t_per_frame = 1.0 / self.actual_framerate
 
         logging.warn(
