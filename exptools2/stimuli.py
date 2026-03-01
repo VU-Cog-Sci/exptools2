@@ -1,7 +1,40 @@
-from psychopy.visual import Circle
+"""Backend-agnostic stimulus conveniences.
 
+For OpenGL-backed primitives, use exptools2.backends.gl.stimuli.
+"""
 
-def create_circle_fixation(win, radius=0.1, color=(1, 1, 1),
-                           edges=100, **kwargs):
-    """ Creates a circle fixation dot with sensible defaults. """
-    return Circle(win, radius=radius, color=color, edges=edges, **kwargs)
+from exptools2.backends.gl.stimuli import (
+    ElementArraySpec,
+    ElementArrayStimulus,
+    GaborSpec,
+    GaborStimulus,
+    ImageSpec,
+    ImageStimulus,
+    LineSpec,
+    LineStimulus,
+    ShapeSpec,
+    ShapeStimulus,
+    TextSpec,
+    TextStimulus,
+    VideoSpec,
+    VideoStimulus,
+    make_gabor_grating,
+)
+
+__all__ = [
+    "ElementArraySpec",
+    "ElementArrayStimulus",
+    "GaborSpec",
+    "GaborStimulus",
+    "ImageSpec",
+    "ImageStimulus",
+    "LineSpec",
+    "LineStimulus",
+    "ShapeSpec",
+    "ShapeStimulus",
+    "TextSpec",
+    "TextStimulus",
+    "VideoSpec",
+    "VideoStimulus",
+    "make_gabor_grating",
+]

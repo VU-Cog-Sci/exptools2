@@ -1,0 +1,98 @@
+run:
+  sub: "001"
+  ses: "01"
+  task: "navarena"
+  run: "01"
+  backend: godot
+  output_root: logs
+  seed: 19
+  contract_version: "1.1"
+  scanner_trigger_mode:
+    mode: none
+    params: {}
+
+conditions:
+  rows:
+    - phase_name: navigation
+      duration_s: 285.0
+      arena_radius: 12.0
+      wall_height: 1.4
+      player_speed: 4.5
+      turn_speed: 1.9
+      collection_radius: 1.0
+      num_gems: 8
+      reward_min: 1
+      reward_max: 5
+      show_gems: false
+      mountain_distance: 80.0
+      auto_quit: true
+      trial_structure:
+        - name: orient
+          mode: orientation
+          duration_s: 20.0
+          num_gems: 0
+          show_gems: false
+          reset_gems: true
+          allow_movement: true
+          allow_collection: false
+        - name: encode_A
+          mode: encoding
+          duration_s: 45.0
+          num_gems: 8
+          show_gems: true
+          reset_gems: true
+          allow_movement: true
+          allow_collection: false
+        - name: retrieve_A1
+          mode: retrieval
+          duration_s: 60.0
+          num_gems: 8
+          show_gems: false
+          reset_gems: false
+          allow_movement: true
+          allow_collection: true
+        - name: retrieve_A2
+          mode: retrieval
+          duration_s: 40.0
+          num_gems: 8
+          show_gems: false
+          reset_gems: false
+          allow_movement: true
+          allow_collection: true
+        - name: encode_B
+          mode: encoding
+          duration_s: 45.0
+          num_gems: 8
+          show_gems: true
+          reset_gems: true
+          allow_movement: true
+          allow_collection: false
+        - name: probe_B
+          mode: probe
+          duration_s: 60.0
+          num_gems: 8
+          show_gems: false
+          reset_gems: false
+          allow_movement: true
+          allow_collection: true
+        - name: intertrial_rest
+          mode: rest
+          duration_s: 15.0
+          num_gems: 0
+          show_gems: false
+          reset_gems: true
+          allow_movement: false
+          allow_collection: false
+
+display:
+  monitor_name: primary
+  monitor_index: 0
+
+godot:
+  executable: godot4
+  scene: ../godot_navigation/nav_arena.tscn
+  args: []
+  host: 127.0.0.1
+  port: 5005
+  timeout_s: 0.02
+  run_timeout_s: 600.0

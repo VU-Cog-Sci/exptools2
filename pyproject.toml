@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exptools2"
+version = "0.1.0.dev0"
+description = "Backend-agnostic experiment runtime for psychophysics and interactive worlds"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Tomas Knapen", email = "tomasknapen@gmail.com" }
+]
+keywords = ["psychophysics", "experiment", "bids", "opengl", "godot"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Scientific/Engineering"
+]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=1.5",
+  "h5py>=3.8",
+  "pyyaml>=6.0",
+  "msgpack_numpy>=0.4.8"
+]
+
+[project.optional-dependencies]
+media = [
+  "Pillow>=10.0"
+]
+gl = [
+  "glfw>=2.5.0",
+  "PyOpenGL>=3.1.0",
+  "Pillow>=10.0"
+]
+video = [
+  "av>=10.0.0"
+]
+audio = [
+  "sounddevice>=0.4.0"
+]
+eyelink = [
+  "sr-research-pylink>=2.1"
+]
+triggerio = [
+  "pyserial>=3.5"
+]
+docs = [
+  "Sphinx>=7.2",
+  "furo>=2024.1.29",
+  "myst-parser>=2.0"
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.3.0",
+  "mypy>=1.8"
+]
+full = [
+  "glfw>=2.5.0",
+  "PyOpenGL>=3.1.0",
+  "Pillow>=10.0",
+  "av>=10.0.0",
+  "sounddevice>=0.4.0",
+  "pyserial>=3.5"
+]
+
+[project.scripts]
+expctl = "exptools2.runner.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/VU-Cog-Sci/exptools2"
+Documentation = "https://github.com/VU-Cog-Sci/exptools2/tree/master/doc"
+Repository = "https://github.com/VU-Cog-Sci/exptools2"
+Issues = "https://github.com/VU-Cog-Sci/exptools2/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["exptools2*"]
+
+[tool.setuptools.package-data]
+"exptools2" = ["data/*", "core/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

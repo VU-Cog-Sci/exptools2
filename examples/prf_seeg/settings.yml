@@ -1,0 +1,115 @@
+stimuli:
+  fix_radius: 0.02
+  fixation_extent: 0.02
+  fix_color: 0.75
+  fixation_base_color: 0.65
+  inner_fix_linewidth: 3.0
+  outer_fix_linewidth: 2.0
+  dartboard_outer_radius: 0.95
+  dartboard_ring_fractions: [0.5, 0.375, 0.25, 0.125]
+  aperture_radius: 0.95
+  refresh_rate: 60
+  bg_stim_h5file: "stims_1024.h5"
+  bg_stim_url: "https://figshare.com/ndownloader/files/31165414"
+  bg_stim_refresh_time: 0.0666666666667
+  bar_refresh_times: [0.0666666666667]
+  bar_directions: [-1, 0, 225, -1, 90, 315, -1, 180, 45, -1, 270, 135, -1]
+  bar_widths: [0.1, 0.2, 0.3]
+  bar_blank_duration: 0.03333333333333
+  bar_blank_interval: 0.06666666666667
+  response_keys: ["b", "j", "k", "l", "semicolon"]
+
+design:
+  offset_ifi_duration: 1.0
+  minimal_ifi_duration: 0.5
+  gaussian_ifi_sd: 0.125
+  exponential_ifi_mean: 0.25
+  start_duration: 4.0
+  end_duration: 16.0
+  bar_duration: 12.0
+  blank_duration: 12.0
+  response_window_s: 1.0
+  ttl_trigger_delay: 0.001
+  ttl_trigger_bar: 2
+  ttl_trigger_blank: 3
+  ttl_trigger_start: 5
+  ttl_trigger_end: 250
+  ttl_trigger_abort: 251
+  ttl_trigger_error: 252
+  ttl_trigger_pulse: 1
+  ttl_trigger_response: 20
+
+display:
+  width: 1920
+  height: 1080
+  refresh_hz: 60
+  fullscreen: true
+  hide_cursor: true
+  monitor_name: "primary"
+  monitor_index: 0
+
+eyelink:
+  enabled: false
+  address: "100.1.1.1"
+  calibrate_on_start: true
+  drift_correct_on_start: false
+  send_input_messages: true
+  send_flip_messages: false
+  flip_message_stride: 60
+  sample_rate: 1000
+  options:
+    calibration_type: HV9
+    file_event_filter: "LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON,INPUT"
+    link_event_filter: "LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON"
+    link_sample_data: "LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS,HTARGET"
+
+trigger_io:
+  enabled: false
+  mode: "parallel"     # parallel | serial | both
+  dry_run: false
+  pulse_width_ms: 1.0
+  auto_zero: true
+  parallel:
+    address: 0x0378
+  serial:
+    port: null
+    baudrate: 115200
+    write_mode: "byte"  # byte | ascii
+  codes:
+    run_started: 5
+    run_ended_ok: 250
+    run_ended_aborted: 251
+    run_ended_error: 252
+    abort: 251
+    pulse: 1
+    response: 20
+  phase_codes:
+    barpass: 2
+    blank: 3
+
+prelude:
+  enabled: true
+  background_color: [0.5, 0.5, 0.5, 1.0]
+  instruction:
+    text: "Press SPACE to continue.\n\nFixate and press T to start."
+    continue_keys: ["space"]
+    timeout_s: null
+    style:
+      panel_width_fraction: 0.76
+      panel_height_fraction: 0.54
+      panel_padding_px: 56
+      panel_corner_radius_px: 26
+      panel_shadow_offset_px: 8
+      panel_fill: [0.07, 0.09, 0.12, 0.86]
+      panel_border: [0.88, 0.9, 0.95, 0.34]
+      text_color: [0.97, 0.98, 1.0, 1.0]
+      text_align: "center"
+      font_size_px: 44
+      font_size_min_px: 18
+      line_spacing_px: 10
+  fixation_wait:
+    enabled: true
+    start_keys: ["t"]
+    color: [0.85, 0.85, 0.85, 1.0]
+    extent: 0.03
+    line_width_px: 2.0

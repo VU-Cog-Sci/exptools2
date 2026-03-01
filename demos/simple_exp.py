@@ -1,57 +1,43 @@
-import os.path as op
-from exptools2.core import Session
-from exptools2.core import Trial
-from psychopy.visual import TextStim
-from exptools2 import utils
+from __future__ import annotations
 
-class TestTrial(Trial):
-    """ Simple trial with text (trial x) and fixation. """
-    def __init__(self, session, trial_nr, phase_durations, txt=None, **kwargs):
-        super().__init__(session, trial_nr, phase_durations, **kwargs)
-        self.txt = TextStim(self.session.win, txt) 
+import time
 
-    def draw(self):
-        """ Draws stimuli """
-        if self.phase == 0:
-            self.txt.draw()
-        else:
-            self.session.default_fix.draw()
+from exptools2.backends.headless import HeadlessDisplayBackend
+from exptools2.core import (
+    ConditionTrial,
+    DisplayConfig,
+    Phase,
+    RunLogger,
+    RunRequest,
+    ScannerTriggerMode,
+    Session,
+)
 
 
-class TestSession(Session):
-    """ Simple session with x trials. """
-    def __init__(self, output_str, output_dir=None, settings_file=None, n_trials=10):
-        """ Initializes TestSession object. """
-        self.n_trials = n_trials
-        super().__init__(output_str, output_dir=None, settings_file=settings_file)
+if __name__ == "__main__":
+    request = RunRequest(
+        bids_stem="sub-001_ses-01_task-demo_run-01",
+        condition_row={"n_rows": 2},
+        seed=42,
+        t0_ns=time.monotonic_ns(),
+        scanner_trigger_mode=ScannerTriggerMode(mode="none"),
+    )
 
-    def create_trials(self, durations=(.5, .5), timing='seconds'):
-        self.trials = []
-        for trial_nr in range(self.n_trials):
-            self.trials.append(
-                TestTrial(session=self,
-                          trial_nr=trial_nr,
-                          phase_durations=durations,
-                          txt='Trial %i' % trial_nr,
-                          parameters=dict(trial_type='even' if trial_nr % 2 == 0 else 'odd'),
-                          verbose=True,
-                          timing=timing)
-            )
+    logger = RunLogger(output_root="logs", bids_stem=request.bids_stem, backend="headless")
+    backend = HeadlessDisplayBackend()
+    session = Session(
+        request=request,
+        backend=backend,
+        logger=logger,
+        display_config=DisplayConfig(fullscreen=False, refresh_hz=60),
+    )
 
-    def run(self):
-        """ Runs experiment. """
-        self.start_experiment()
-        for trial in self.trials:
-            trial.run()            
+    session.add_trials(
+        [
+            ConditionTrial(trial_nr=0, phases=[Phase(name="stim", duration_s=0.25)]),
+            ConditionTrial(trial_nr=1, phases=[Phase(name="stim", duration_s=0.25)]),
+        ]
+    )
 
-        self.close()
-
-
-if __name__ == '__main__':
-
-    settings = op.join(op.dirname(__file__), 'settings.yml')
-    session = TestSession('sub-01', n_trials=100, settings_file=settings)
-    session.create_trials(durations=(.25, .25), timing='seconds')
-    #session.create_trials(durations=(3, 3), timing='frames')
-    session.run()
-    session.quit()
+    result = session.run()
+    print(result)

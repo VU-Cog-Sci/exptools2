@@ -1,0 +1,67 @@
+run:
+  sub: "001"
+  ses: "01"
+  task: "eyelinkdemo"
+  run: "01"
+  backend: "gl"
+  output_root: "logs"
+  seed: 123
+  contract_version: "1.1"
+  scanner_trigger_mode:
+    mode: "none"
+    params: {}
+
+display:
+  width: 1280
+  height: 720
+  refresh_hz: 60
+  fullscreen: false
+  hide_cursor: true
+  vsync: true
+
+eyelink:
+  enabled: false
+  address: "100.1.1.1"
+  calibrate_on_start: true
+  drift_correct_on_start: false
+  sample_rate: 1000
+  send_input_messages: true
+  send_flip_messages: false
+  options:
+    calibration_type: HV9
+    file_event_filter: "LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON,INPUT"
+    link_event_filter: "LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON"
+    link_sample_data: "LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS,HTARGET"
+
+trigger_io:
+  enabled: false
+  mode: "parallel"
+  dry_run: true
+  pulse_width_ms: 1.0
+  auto_zero: true
+  parallel:
+    address: 0x0378
+  serial:
+    port: null
+    baudrate: 115200
+    write_mode: "byte"
+  codes:
+    run_started: 5
+    run_ended_ok: 250
+    run_ended_aborted: 251
+    run_ended_error: 252
+    abort: 255
+    pulse: 1
+    response: 20
+  phase_codes:
+    stim: 2
+
+conditions:
+  rows:
+    - phase_name: "fix"
+      duration_s: 1.0
+      draw_command:
+        kind: "shape"
+        shape: "circle"
+        center: [0.0, 0.0]
+        size: [0.1, 0.1]

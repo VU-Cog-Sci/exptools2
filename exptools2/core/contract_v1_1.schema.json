@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://exptools2.org/schemas/run_contract_v1_1.json",
+  "title": "exptools2 Run Contract v1.1",
+  "type": "object",
+  "required": ["contract_version", "bids_stem", "condition_row", "seed", "t0_ns", "scanner_trigger_mode"],
+  "properties": {
+    "contract_version": {"type": "string", "const": "1.1"},
+    "bids_stem": {
+      "type": "string",
+      "pattern": "^sub-[A-Za-z0-9]+_ses-[A-Za-z0-9]+_task-[A-Za-z0-9]+_run-[A-Za-z0-9]+$"
+    },
+    "condition_row": {"type": "object"},
+    "seed": {"type": "integer"},
+    "t0_ns": {"type": "integer", "minimum": 1},
+    "scanner_trigger_mode": {
+      "type": "object",
+      "required": ["mode", "params"],
+      "properties": {
+        "mode": {"type": "string", "enum": ["none", "key", "ttl", "lsl"]},
+        "params": {"type": "object"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

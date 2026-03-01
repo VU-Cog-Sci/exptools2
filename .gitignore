@@ -68,6 +68,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+doc/_build/
 
 # PyBuilder
 target/
@@ -121,3 +122,6 @@ dmypy.json
 **/logs
 
 **/.DS_Store
+
+# large local stimulus assets (downloaded/generated)
+examples/prf_seeg/stimuli/*.h5

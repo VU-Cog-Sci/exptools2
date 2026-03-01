@@ -1,0 +1,3 @@
+phase_name	duration_s	draw_kind	orientation_deg	spatial_freq
+stim	0.5	gabor	30	3
+stim	0.5	gabor	120	5

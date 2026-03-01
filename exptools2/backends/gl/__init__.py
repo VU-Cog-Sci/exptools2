@@ -1,0 +1,37 @@
+from .backend import GLDisplayBackend
+from .stimuli import (
+    ElementArraySpec,
+    ElementArrayStimulus,
+    GaborSpec,
+    GaborStimulus,
+    ImageSpec,
+    ImageStimulus,
+    LineSpec,
+    LineStimulus,
+    ShapeSpec,
+    ShapeStimulus,
+    TextSpec,
+    TextStimulus,
+    VideoSpec,
+    VideoStimulus,
+    make_gabor_grating,
+)
+
+__all__ = [
+    "ElementArraySpec",
+    "ElementArrayStimulus",
+    "GLDisplayBackend",
+    "GaborSpec",
+    "GaborStimulus",
+    "ImageSpec",
+    "ImageStimulus",
+    "LineSpec",
+    "LineStimulus",
+    "ShapeSpec",
+    "ShapeStimulus",
+    "TextSpec",
+    "TextStimulus",
+    "VideoSpec",
+    "VideoStimulus",
+    "make_gabor_grating",
+]

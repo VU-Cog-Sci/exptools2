@@ -1,341 +1,756 @@
-import os
-import yaml
-import collections
-import os.path as op
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from psychopy import core
-from psychopy.sound import Sound
-from psychopy.hardware.emulator import SyncGenerator
-from psychopy.visual import Window, TextStim
-from psychopy.event import waitKeys, Mouse
-from psychopy.monitors import Monitor
-from psychopy import logging
-from psychopy import prefs as psychopy_prefs
-from ..stimuli import create_circle_fixation
+from __future__ import annotations
+
+import random
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from .contract import validate_run_request
+from .interfaces import DisplayBackend
+from .logger import RunLogger
+from .scheduler import NonSlipScheduler
+from .trial import Trial
+from .types import DisplayConfig, DrawBatch, RunEndStatus, RunRequest, StatusKind
+
+
+@dataclass(slots=True)
+class SessionResult:
+    run_start_ns: int
+    run_end_ns: int
+    status: RunEndStatus
+    error: str | None = None
 
 
 class Session:
-    """Base Session class"""
+    """Core run engine that is backend-agnostic and contract-aware."""
 
-    def __init__(self, output_str, output_dir=None, settings_file=None):
-        """Initializes base Session class.
+    def __init__(
+        self,
+        request: RunRequest,
+        backend: DisplayBackend,
+        logger: RunLogger,
+        display_config: DisplayConfig | None = None,
+        scheduler: NonSlipScheduler | None = None,
+        recorders: list[Any] | None = None,
+        prelude: dict[str, Any] | None = None,
+    ) -> None:
+        validate_run_request(request)
+        self.request = request
+        self.backend = backend
+        self.logger = logger
+        self.display_config = display_config or DisplayConfig()
+        self.scheduler = scheduler or NonSlipScheduler(t0_ns=request.t0_ns)
+        self.recorders = list(recorders or [])
+        self.prelude = dict(prelude or {})
+        self.trials: list[Trial] = []
+        random.seed(request.seed)
 
-        parameters
-        ----------
-        output_str : str
-            Name (string) for output-files (e.g., 'sub-01_ses-post_run-1')
-        output_dir : str
-            Path to output-directory. Default: $PWD/logs.
-        settings_file : str
-            Path to settings file. If None, exptools2's default_settings.yml is used
+    def add_trial(self, trial: Trial) -> None:
+        self.trials.append(trial)
 
-        attributes
-        ----------
-        settings : dict
-            Dictionary with settings from yaml
-        clock : psychopy Clock
-            Global clock (reset to 0 at start exp)
-        timer : psychopy Clock
-            Timer used to time phases
-        exp_start : float
-            Time at actual start of experiment
-        log : psychopy Logfile
-            Logfile with info about exp (level >= EXP)
-        nr_frames : int
-            Counter for number of frames for each phase
-        win : psychopy Window
-            Current window
-        default_fix : TextStim
-            Default fixation stim (a TextStim with '+')
-        actual_framerate : float
-            Estimated framerate of monitor
-        """
-        self.output_str = output_str
-        self.output_dir = (
-            op.join(os.getcwd(), "logs") if output_dir is None else output_dir
+    def add_trials(self, trials: list[Trial]) -> None:
+        self.trials.extend(trials)
+
+    def _event_type_for_key(self, key: str) -> tuple[str, StatusKind]:
+        scanner_key = self.request.scanner_trigger_mode.params.get("key", "5")
+        if self.request.scanner_trigger_mode.mode in {"key", "ttl"} and key == scanner_key:
+            return "pulse", StatusKind.SYNC
+        return "response", StatusKind.EVENT
+
+    def _sanitize_stim_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for key, value in params.items():
+            if key == "image":
+                shape = getattr(value, "shape", None)
+                dtype = getattr(value, "dtype", None)
+                out["image_meta"] = {
+                    "shape": list(shape) if shape is not None else None,
+                    "dtype": str(dtype) if dtype is not None else type(value).__name__,
+                }
+                continue
+            out[key] = value
+        return out
+
+    def _notify_recorders(
+        self,
+        method: str,
+        *args: Any,
+        recorders: list[Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        active = self.recorders if recorders is None else recorders
+        for recorder in active:
+            callback = getattr(recorder, method, None)
+            if not callable(callback):
+                continue
+            try:
+                callback(*args, **kwargs)
+            except Exception as exc:
+                self.logger.log_event(
+                    onset_ns=time.monotonic_ns(),
+                    event_type="recorder_error",
+                    recorder=recorder.__class__.__name__,
+                    method=method,
+                    message=str(exc),
+                )
+
+    def _start_recorders(self) -> list[Any]:
+        outdir = self.logger.paths.events_tsv.parent
+        started: list[Any] = []
+        for recorder in self.recorders:
+            recorder.start(stem=self.request.bids_stem, output_dir=outdir)
+            started.append(recorder)
+        return started
+
+    def _register_recorder_artifacts(self, recorder: Any) -> None:
+        records_fn = getattr(recorder, "artifact_records", None)
+        if callable(records_fn):
+            for kind, path in records_fn():
+                self.logger.register_artifact(path=path, kind=str(kind))
+            return
+
+        paths_fn = getattr(recorder, "artifact_paths", None)
+        if callable(paths_fn):
+            for path in paths_fn():
+                kind = f"{recorder.__class__.__name__.lower()}_artifact"
+                self.logger.register_artifact(path=path, kind=kind)
+
+    def _stop_recorders(self, recorders: list[Any]) -> None:
+        for recorder in reversed(recorders):
+            try:
+                recorder.stop()
+            except Exception as exc:
+                self.logger.log_event(
+                    onset_ns=time.monotonic_ns(),
+                    event_type="recorder_error",
+                    recorder=recorder.__class__.__name__,
+                    method="stop",
+                    message=str(exc),
+                )
+            finally:
+                self._register_recorder_artifacts(recorder)
+
+    def _prelude_section(self, name: str) -> dict[str, Any]:
+        raw = self.prelude.get(name, {})
+        return dict(raw) if isinstance(raw, dict) else {}
+
+    def _framebuffer_size(self) -> tuple[int, int]:
+        fn = getattr(self.backend, "framebuffer_size", None)
+        if callable(fn):
+            try:
+                w, h = fn()
+                w_i, h_i = int(w), int(h)
+                if w_i > 0 and h_i > 0:
+                    return w_i, h_i
+            except Exception:
+                pass
+        return max(1, int(self.display_config.width)), max(1, int(self.display_config.height))
+
+    def _as_rgba_float(
+        self,
+        value: Any,
+        default: tuple[float, float, float, float],
+    ) -> tuple[float, float, float, float]:
+        if isinstance(value, (list, tuple)):
+            seq = [float(v) for v in value]
+        else:
+            seq = list(default)
+        if len(seq) < 3:
+            seq = list(default)
+        if len(seq) == 3:
+            seq.append(default[3])
+        seq = seq[:4]
+        if max(abs(v) for v in seq) > 1.0:
+            seq = [seq[0] / 255.0, seq[1] / 255.0, seq[2] / 255.0, seq[3] / 255.0 if seq[3] > 1.0 else seq[3]]
+        return (
+            max(0.0, min(1.0, float(seq[0]))),
+            max(0.0, min(1.0, float(seq[1]))),
+            max(0.0, min(1.0, float(seq[2]))),
+            max(0.0, min(1.0, float(seq[3]))),
         )
-        self.settings_file = settings_file
-        self.clock = core.Clock()
-        self.timer = core.Clock()
-        self.exp_start = None
-        self.exp_stop = None
-        self.current_trial = None
-        self.global_log = pd.DataFrame(
-            columns=[
-                "trial_nr",
-                "onset",
-                "event_type",
-                "phase",
-                "response",
-                "nr_frames",
+
+    def _as_rgba_u8(
+        self,
+        value: Any,
+        default: tuple[float, float, float, float],
+    ) -> tuple[int, int, int, int]:
+        rgba = self._as_rgba_float(value, default=default)
+        return tuple(int(round(v * 255.0)) for v in rgba)
+
+    @staticmethod
+    def _coerce_float(value: Any, default: float) -> float:
+        try:
+            return float(value)
+        except Exception:
+            return default
+
+    @staticmethod
+    def _coerce_pair(value: Any, default: tuple[float, float]) -> tuple[float, float]:
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            try:
+                return float(value[0]), float(value[1])
+            except Exception:
+                return default
+        return default
+
+    @staticmethod
+    def _load_font(font_size_px: int, font_path: str | None = None) -> Any:
+        from PIL import ImageFont
+
+        candidates: list[str] = []
+        if font_path:
+            candidates.append(str(font_path))
+        candidates.extend(
+            [
+                "SF Pro Text.ttf",
+                "SF Pro Display.ttf",
+                "HelveticaNeue.ttc",
+                "Arial.ttf",
+                "DejaVuSans.ttf",
             ]
         )
-        self.nr_frames = 0  # keeps track of nr of nr of frame flips
-        self.first_trial = True
-        self.closed = False
+        for candidate in candidates:
+            try:
+                return ImageFont.truetype(candidate, size=font_size_px)
+            except Exception:
+                continue
+        return ImageFont.load_default()
 
-        # Initialize
-        self.settings = self._load_settings()
-        self.monitor = self._create_monitor()
-        self.win = self._create_window()
-        self.width_deg = 2 * np.degrees(
-            np.arctan(self.monitor.getWidth() / self.monitor.getDistance())
+    @staticmethod
+    def _wrap_text_lines(draw: Any, text: str, font: Any, max_width_px: int) -> list[str]:
+        lines: list[str] = []
+        for para in str(text).splitlines():
+            paragraph = para.strip()
+            if not paragraph:
+                lines.append("")
+                continue
+            words = paragraph.split()
+            cur = words[0]
+            for word in words[1:]:
+                trial = f"{cur} {word}"
+                if draw.textlength(trial, font=font) <= max_width_px:
+                    cur = trial
+                else:
+                    lines.append(cur)
+                    cur = word
+            lines.append(cur)
+        return lines or [""]
+
+    @staticmethod
+    def _line_height(font: Any) -> int:
+        try:
+            bbox = font.getbbox("Ag")
+            return max(1, int(bbox[3] - bbox[1]))
+        except Exception:
+            return max(1, int(getattr(font, "size", 16)))
+
+    def _prelude_background_batch(self) -> DrawBatch:
+        bg_cfg = self._prelude_section("background")
+        bg_val = bg_cfg.get("color", self.prelude.get("background_color", [0.0, 0.0, 0.0, 1.0]))
+        bg = self._as_rgba_float(bg_val, default=(0.0, 0.0, 0.0, 1.0))
+
+        batch = DrawBatch()
+        batch.add(
+            "shape",
+            shape="rect",
+            center=(0.0, 0.0),
+            size=(2.0, 2.0),
+            fill_color=bg,
+            stroke_width=0.0,
         )
-        self.pix_per_deg = self.win.size[0] / self.width_deg
-        self.mouse = Mouse(**self.settings["mouse"])
-        self.logfile = self._create_logfile()
-        self.default_fix = create_circle_fixation(
-            self.win, radius=0.075, color=(1, 1, 1)
-        )
-        self.mri_trigger = None  # is set below
-        self.mri_simulator = self._setup_mri()
+        return batch
 
-    def _load_settings(self):
-        """Loads settings and sets preferences."""
-        default_settings_path = op.join(
-            op.dirname(op.dirname(__file__)), "data", "default_settings.yml"
-        )
-        with open(default_settings_path, "r", encoding="utf8") as f_in:
-            default_settings = yaml.safe_load(f_in)
-
-        if self.settings_file is None:
-            settings = default_settings
-            logging.warn("No settings-file given; using default logfile")
-        else:
-            if not op.isfile(self.settings_file):
-                raise IOError(f"Settings-file {self.settings_file} does not exist!")
-
-            with open(self.settings_file, "r", encoding="utf8") as f_in:
-                user_settings = yaml.safe_load(f_in)
-
-            # Update (and potentially overwrite) default settings
-            _merge_settings(default_settings, user_settings)
-            settings = default_settings
-
-        # Write settings to sub dir
-        if not op.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
-
-        settings_out = op.join(self.output_dir, self.output_str + "_expsettings.yml")
-        with open(settings_out, "w") as f_out:  # write settings to disk
-            yaml.dump(settings, f_out, indent=4, default_flow_style=False)
-
-        exp_prefs = settings["preferences"]  # set preferences globally
-        for preftype, these_settings in exp_prefs.items():
-            for key, value in these_settings.items():
-                pref_subclass = getattr(psychopy_prefs, preftype)
-                pref_subclass[key] = value
-                setattr(psychopy_prefs, preftype, pref_subclass)
-
-        return settings
-
-    def _create_monitor(self):
-        """Creates the monitor based on settings and save to disk."""
-        monitor = Monitor(**self.settings["monitor"])
-        monitor.setSizePix(self.settings["window"]["size"])
-        monitor.save()  # needed for iohub eyetracker
-        return monitor
-
-    def _create_window(self):
-        """Creates a window based on the settings and calculates framerate."""
-        win = Window(monitor=self.monitor.name, **self.settings["window"])
-        win.flip(clearBuffer=True)
-        self.actual_framerate = win.getActualFrameRate()
-        if self.actual_framerate is None:
-            logging.warn("framerate not measured, substituting 60 by default")
-            self.actual_framerate = 60.0
-        t_per_frame = 1.0 / self.actual_framerate
-
-        logging.warn(
-            f"Actual framerate: {self.actual_framerate:.5f} "
-            f"(1 frame = {t_per_frame:.5f})"
-        )
-        return win
-
-    def _create_logfile(self):
-        """Creates a logfile."""
-        log_path = op.join(self.output_dir, self.output_str + "_log.txt")
-        return logging.LogFile(f=log_path, filemode="w", level=logging.EXP)
-
-    def _setup_mri(self):
-        """Initializes an MRI simulator"""
-        args = self.settings["mri"].copy()
-        self.mri_trigger = self.settings["mri"]["sync"]
-        if args["simulate"]:
-            args.pop("simulate")
-            return SyncGenerator(**args)
-        else:
+    def _render_instruction_text_image(self, text: str, instruction_cfg: dict[str, Any]) -> Any:
+        try:
+            from PIL import Image, ImageDraw
+        except Exception:
             return None
+        import numpy as np
 
-    def start_experiment(self, wait_n_triggers=None, show_fix_during_dummies=True):
-        """Logs the onset of the start of the experiment.
-
-        Parameters
-        ----------
-        wait_n_triggers : int (or None)
-            Number of MRI-triggers ('syncs') to wait before actually
-            starting the experiment. This is useful when you have
-            'dummy' scans that send triggers to the stimulus-PC.
-            Note: clock is still reset right after calling this
-            method.
-        show_fix_during_dummies : bool
-            Whether to show a fixation cross during dummy scans.
-        """
-        self.exp_start = self.clock.getTime()
-        self.clock.reset()  # resets global clock
-        self.timer.reset()  # phase-timer
-
-        if self.mri_simulator is not None:
-            self.mri_simulator.start()
-
-        self.win.recordFrameIntervals = True
-
-        if wait_n_triggers is not None:
-            print(f"Waiting {wait_n_triggers} triggers before starting ...")
-            n_triggers = 0
-
-            if show_fix_during_dummies:
-                self.default_fix.draw()
-                self.win.flip()
-
-            while n_triggers < wait_n_triggers:
-                waitKeys(keyList=[self.settings["mri"].get("sync", "t")])
-                n_triggers += 1
-                msg = f"\tOnset trigger {n_triggers}: {self.clock.getTime(): .5f}"
-                msg = msg + "\n" if n_triggers == wait_n_triggers else msg
-                print(msg)
-
-            self.timer.reset()
-
-    def _set_exp_stop(self):
-        """Called on last win.flip(); timestamps end of exp."""
-        self.exp_stop = self.clock.getTime()
-
-    def display_text(self, text, keys=None, duration=None, **kwargs):
-        """Displays text on the window and waits for a key response.
-        The 'keys' and 'duration' arguments are mutually exclusive.
-
-        parameters
-        ----------
-        text : str
-            Text to display
-        keys : str or list[str]
-            String (or list of strings) of keyname(s) to wait for
-        kwargs : key-word args
-            Any (set of) parameter(s) passed to TextStim
-        """
-        if keys is None and duration is None:
-            raise ValueError("Please set either 'keys' or 'duration'!")
-
-        if keys is not None and duration is not None:
-            raise ValueError("Cannot set both 'keys' and 'duration'!")
-
-        stim = TextStim(self.win, text=text, **kwargs)
-        stim.draw()
-        self.win.flip()
-
-        if keys is not None:
-            waitKeys(keyList=keys)
-
-        if duration is not None:
-            core.wait(duration)
-
-    def close(self):
-        """'Closes' experiment. Should always be called, even when
-        experiment is quit manually (saves onsets to file)."""
-
-        if self.closed:  # already closed!
-            return None
-
-        self.win.callOnFlip(self._set_exp_stop)
-        self.win.flip()
-        self.win.recordFrameIntervals = False
-
-        print(f"\nDuration experiment: {self.exp_stop:.3f}\n")
-
-        if not op.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
-
-        self.global_log = pd.DataFrame(self.global_log).set_index("trial_nr")
-        self.global_log["onset_abs"] = self.global_log["onset"] + self.exp_start
-
-        # Only non-responses have a duration
-        nonresp_idx = ~self.global_log.event_type.isin(["response", "trigger", "pulse"])
-        last_phase_onset = self.global_log.loc[nonresp_idx, "onset"].iloc[-1]
-        dur_last_phase = self.exp_stop - last_phase_onset
-        durations = np.append(
-            self.global_log.loc[nonresp_idx, "onset"].diff().values[1:], dur_last_phase
+        style_cfg = dict(instruction_cfg.get("style", {})) if isinstance(instruction_cfg.get("style"), dict) else {}
+        fb_w, fb_h = self._framebuffer_size()
+        canvas_w = int(
+            instruction_cfg.get(
+                "text_width_px",
+                self.prelude.get("instruction_text_width_px", fb_w),
+            )
         )
-        self.global_log.loc[nonresp_idx, "duration"] = durations
-
-        # Same for nr frames
-        nr_frames = np.append(
-            self.global_log.loc[nonresp_idx, "nr_frames"].values[1:], self.nr_frames
+        canvas_h = int(
+            instruction_cfg.get(
+                "text_height_px",
+                self.prelude.get("instruction_text_height_px", fb_h),
+            )
         )
-        self.global_log.loc[nonresp_idx, "nr_frames"] = nr_frames.astype(int)
+        canvas_w = max(320, canvas_w)
+        canvas_h = max(180, canvas_h)
 
-        # Round for readability and save to disk
-        self.global_log = self.global_log.round(
-            {"onset": 5, "onset_abs": 5, "duration": 5}
+        render_scale = max(0.75, self._coerce_float(style_cfg.get("render_scale"), 1.0))
+        render_w = max(320, int(round(canvas_w * render_scale)))
+        render_h = max(180, int(round(canvas_h * render_scale)))
+
+        panel_width_fraction = max(0.3, min(0.95, self._coerce_float(style_cfg.get("panel_width_fraction"), 0.78)))
+        panel_height_fraction = max(0.25, min(0.95, self._coerce_float(style_cfg.get("panel_height_fraction"), 0.58)))
+        panel_w = int(round(render_w * panel_width_fraction))
+        panel_h = int(round(render_h * panel_height_fraction))
+
+        panel_padding_px = max(12, int(round(self._coerce_float(style_cfg.get("panel_padding_px"), 48.0) * render_scale)))
+        corner_radius_px = max(0, int(round(self._coerce_float(style_cfg.get("panel_corner_radius_px"), 26.0) * render_scale)))
+        border_px = max(0, int(round(self._coerce_float(style_cfg.get("panel_border_px"), 2.0) * render_scale)))
+        line_spacing_px = max(2, int(round(self._coerce_float(style_cfg.get("line_spacing_px"), 10.0) * render_scale)))
+
+        panel_fill = self._as_rgba_u8(style_cfg.get("panel_fill"), default=(0.08, 0.10, 0.14, 0.88))
+        panel_border = self._as_rgba_u8(style_cfg.get("panel_border"), default=(0.85, 0.88, 0.94, 0.38))
+        text_color = self._as_rgba_u8(
+            style_cfg.get("text_color", self.prelude.get("instruction_text_fg_rgb", [255, 255, 255])),
+            default=(0.96, 0.97, 0.99, 1.0),
         )
-        f_out = op.join(self.output_dir, self.output_str + "_events.tsv")
-        self.global_log.to_csv(f_out, sep="\t", index=True)
+        shadow = self._as_rgba_u8(style_cfg.get("panel_shadow"), default=(0.0, 0.0, 0.0, 0.26))
+        shadow_offset = max(0, int(round(self._coerce_float(style_cfg.get("panel_shadow_offset_px"), 8.0) * render_scale)))
 
-        # Create figure with frametimes (to check for dropped frames)
-        fig, ax = plt.subplots(figsize=(15, 5))
-        ax.plot(self.win.frameIntervals)
-        ax.axhline(1.0 / self.actual_framerate, c="r")
-        ax.axhline(
-            1.0 / self.actual_framerate + 1.0 / self.actual_framerate, c="r", ls="--"
+        x0 = max(0, int((render_w - panel_w) / 2 + self._coerce_float(style_cfg.get("offset_x_px"), 0.0)))
+        y0 = max(0, int((render_h - panel_h) / 2 + self._coerce_float(style_cfg.get("offset_y_px"), 0.0)))
+        x1 = min(render_w - 1, x0 + panel_w)
+        y1 = min(render_h - 1, y0 + panel_h)
+
+        img = Image.new("RGBA", (render_w, render_h), color=(0, 0, 0, 0))
+        draw = ImageDraw.Draw(img, "RGBA")
+
+        if shadow[3] > 0 and shadow_offset > 0:
+            draw.rounded_rectangle(
+                [x0 + shadow_offset, y0 + shadow_offset, x1 + shadow_offset, y1 + shadow_offset],
+                radius=corner_radius_px,
+                fill=shadow,
+            )
+        draw.rounded_rectangle([x0, y0, x1, y1], radius=corner_radius_px, fill=panel_fill)
+        if border_px > 0:
+            draw.rounded_rectangle(
+                [x0, y0, x1, y1],
+                radius=corner_radius_px,
+                outline=panel_border,
+                width=border_px,
+            )
+
+        text_area_w = max(40, panel_w - 2 * panel_padding_px)
+        text_area_h = max(40, panel_h - 2 * panel_padding_px)
+        font_size_px = int(round(self._coerce_float(style_cfg.get("font_size_px"), 44.0) * render_scale))
+        font_size_min_px = int(round(self._coerce_float(style_cfg.get("font_size_min_px"), 18.0) * render_scale))
+        font_size_px = max(font_size_min_px, font_size_px)
+        font_path = style_cfg.get("font_path")
+
+        chosen_font = self._load_font(font_size_px, font_path=font_path)
+        wrapped_lines = self._wrap_text_lines(draw, text, chosen_font, text_area_w)
+        chosen_line_h = self._line_height(chosen_font)
+        align = str(style_cfg.get("text_align", "center")).lower()
+        text_widths = [int(draw.textlength(line, font=chosen_font)) for line in wrapped_lines]
+
+        for try_size in range(font_size_px, font_size_min_px - 1, -2):
+            font = self._load_font(try_size, font_path=font_path)
+            lines = self._wrap_text_lines(draw, text, font, text_area_w)
+            line_h = self._line_height(font)
+            widths = [int(draw.textlength(line, font=font)) for line in lines]
+            block_h = len(lines) * line_h + max(0, len(lines) - 1) * line_spacing_px
+            if (not widths or max(widths) <= text_area_w) and block_h <= text_area_h:
+                chosen_font = font
+                wrapped_lines = lines
+                chosen_line_h = line_h
+                text_widths = widths
+                break
+
+        block_h = len(wrapped_lines) * chosen_line_h + max(0, len(wrapped_lines) - 1) * line_spacing_px
+        text_y = y0 + int((panel_h - block_h) / 2)
+        text_x_left = x0 + panel_padding_px
+        text_x_right = x1 - panel_padding_px
+        for line, line_w in zip(wrapped_lines, text_widths):
+            if align == "left":
+                text_x = text_x_left
+            elif align == "right":
+                text_x = text_x_right - line_w
+            else:
+                text_x = x0 + int((panel_w - line_w) / 2)
+            draw.text((text_x, text_y), line, font=chosen_font, fill=text_color)
+            text_y += chosen_line_h + line_spacing_px
+
+        if render_w != canvas_w or render_h != canvas_h:
+            img = img.resize((canvas_w, canvas_h), resample=Image.Resampling.LANCZOS)
+        return np.ascontiguousarray(img, dtype=np.uint8)
+
+    def _instruction_batch(self) -> DrawBatch:
+        batch = self._prelude_background_batch()
+        instruction_cfg = self._prelude_section("instruction")
+        instruction_image = instruction_cfg.get("image", self.prelude.get("instruction_image"))
+        if instruction_image:
+            size = instruction_cfg.get("size", self.prelude.get("instruction_image_size", (1.5, 0.9)))
+            center = instruction_cfg.get("center", self.prelude.get("instruction_image_center", (0.0, 0.0)))
+            batch.add(
+                "image",
+                source=str(instruction_image),
+                center=tuple(center),
+                size=tuple(size),
+                coord_space="square",
+                opacity=1.0,
+            )
+            return batch
+
+        instruction_text = instruction_cfg.get("text", self.prelude.get("instruction_text"))
+        if instruction_text:
+            frame = self._render_instruction_text_image(str(instruction_text), instruction_cfg=instruction_cfg)
+            if frame is not None:
+                center = self._coerce_pair(instruction_cfg.get("center", (0.0, 0.0)), default=(0.0, 0.0))
+                size_val = instruction_cfg.get("size", self.prelude.get("instruction_text_size"))
+                if size_val is not None:
+                    size = self._coerce_pair(size_val, default=(1.45, 0.9))
+                else:
+                    frame_h, frame_w = frame.shape[0], frame.shape[1]
+                    aspect = float(frame_w) / float(max(frame_h, 1))
+                    max_h = self._coerce_float(instruction_cfg.get("max_height"), 1.05)
+                    max_w = self._coerce_float(instruction_cfg.get("max_width"), 1.65)
+                    height = min(max_h, max_w / max(aspect, 1e-6))
+                    width = height * aspect
+                    size = (width, height)
+                batch.add(
+                    "video_frame",
+                    image=frame,
+                    center=center,
+                    size=size,
+                    coord_space="square",
+                    opacity=1.0,
+                )
+        return batch
+
+    def _fixation_wait_batch(self) -> DrawBatch:
+        batch = self._prelude_background_batch()
+        wait_cfg = self._prelude_section("fixation_wait")
+        fix_color = self._as_rgba_float(
+            wait_cfg.get("color", self.prelude.get("fixation_color", [0.8, 0.8, 0.8, 1.0])),
+            default=(0.8, 0.8, 0.8, 1.0),
         )
-        ax.set(
-            xlim=(0, len(self.win.frameIntervals) + 1),
-            xlabel="Frame nr",
-            ylabel="Interval (sec.)",
-            ylim=(-0.01, 0.125),
+        extent = self._coerce_float(
+            wait_cfg.get("extent", self.prelude.get("fixation_extent", 0.03)),
+            0.03,
         )
-        fig.savefig(op.join(self.output_dir, self.output_str + "_frames.pdf"))
+        line_width = self._coerce_float(
+            wait_cfg.get("line_width_px", self.prelude.get("fixation_line_width_px", 2.0)),
+            2.0,
+        )
+        batch.add(
+            "line",
+            start=(-extent, 0.0),
+            end=(extent, 0.0),
+            width=line_width,
+            color=fix_color,
+            coord_space="square",
+        )
+        batch.add(
+            "line",
+            start=(0.0, -extent),
+            end=(0.0, extent),
+            width=line_width,
+            color=fix_color,
+            coord_space="square",
+        )
+        return batch
 
-        if self.mri_simulator is not None:
-            self.mri_simulator.stop()
+    def _normalize_wait_keys(self, keys: Any) -> set[str]:
+        if keys is None:
+            return set()
+        if isinstance(keys, str):
+            return {keys.lower()}
+        if isinstance(keys, (list, tuple, set)):
+            return {str(k).lower() for k in keys}
+        return {str(keys).lower()}
 
-        self.win.close()
-        self.closed = True
+    def _wait_stage(
+        self,
+        batch: DrawBatch,
+        wait_keys: set[str],
+        timeout_s: float | None,
+    ) -> str | None:
+        frame_step_ns = int(1_000_000_000 / max(self.display_config.refresh_hz, 1.0))
+        stage_start_ns = time.monotonic_ns()
+        next_flip_ns = stage_start_ns
+        while True:
+            self.backend.draw(batch)
+            self.backend.flip(target_ns=next_flip_ns)
+            for event in self.backend.poll_input():
+                key = str(event.key).lower()
+                if key == "q":
+                    return "q"
+                if key in wait_keys:
+                    return key
 
-    def quit(self):
-        """Quits Python tread (and window if necessary)."""
+            if timeout_s is not None:
+                elapsed_s = (time.monotonic_ns() - stage_start_ns) / 1_000_000_000.0
+                if elapsed_s >= float(timeout_s):
+                    return None
+            next_flip_ns += frame_step_ns
 
-        if not self.closed:
-            self.close()
+    def _run_prelude(self) -> bool:
+        if not bool(self.prelude.get("enabled", False)):
+            return True
 
-        core.quit()
+        instruction_cfg = self._prelude_section("instruction")
+        instruction_text = instruction_cfg.get("text", self.prelude.get("instruction_text"))
+        instruction_image = instruction_cfg.get("image", self.prelude.get("instruction_image"))
+        has_instruction = bool(instruction_text or instruction_image)
 
+        if has_instruction:
+            wait_keys = self._normalize_wait_keys(
+                instruction_cfg.get("continue_keys", self.prelude.get("instruction_continue_key"))
+            )
+            timeout_s = instruction_cfg.get("timeout_s", self.prelude.get("instruction_duration_s"))
+            if (not wait_keys) and timeout_s is None:
+                timeout_s = 2.0
+            key = self._wait_stage(
+                batch=self._instruction_batch(),
+                wait_keys=wait_keys,
+                timeout_s=float(timeout_s) if timeout_s is not None else None,
+            )
+            if key == "q":
+                return False
 
-def _merge_settings(default, user):
-    """Recursive dict merge. Inspired by dict.update(), instead of
-    updating only top-level keys, dict_merge recurses down into dicts nested
-    to an arbitrary depth, updating keys. The merge_dct is merged into
-    Adapted from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9.
+        wait_cfg = self._prelude_section("fixation_wait")
+        if bool(wait_cfg.get("enabled", self.prelude.get("show_fixation_wait", True))):
+            start_key = wait_cfg.get("start_keys", wait_cfg.get("start_key", self.prelude.get("start_key")))
+            if not start_key:
+                scanner_key = str(self.request.scanner_trigger_mode.params.get("key", "t"))
+                start_key = scanner_key if scanner_key else "t"
+            wait_keys = self._normalize_wait_keys(start_key)
+            key = self._wait_stage(
+                batch=self._fixation_wait_batch(),
+                wait_keys=wait_keys,
+                timeout_s=None,
+            )
+            if key == "q":
+                return False
+        return True
 
-    Parameters
-    ----------
-    default : dict
-        To-be-updated dict
-    user : dict
-        Dict to merge in default
+    def run(self) -> SessionResult:
+        run_start_ns = int(self.request.t0_ns)
+        run_end_ns = run_start_ns
+        frame_step_ns = int(1_000_000_000 / max(self.display_config.refresh_hz, 1.0))
 
-    Returns
-    -------
-    None
-    """
-    for k, v in user.items():
-        if (
-            k in default
-            and isinstance(default[k], dict)
-            and isinstance(user[k], collections.abc.Mapping)
-        ):
-            _merge_settings(default[k], user[k])
-        else:
-            default[k] = user[k]
+        status = RunEndStatus.OK
+        error_msg: str | None = None
+        abort_requested = False
+        abort_reason: str | None = None
+        started_recorders: list[Any] = []
+        run_started_emitted = False
+
+        try:
+            self.backend.initialize(self.display_config)
+            started_recorders = self._start_recorders()
+            if not self._run_prelude():
+                run_end_ns = time.monotonic_ns()
+                status = RunEndStatus.ABORTED
+                error_msg = "aborted_during_prelude"
+                self.logger.log_status(
+                    StatusKind.RUN_ENDED,
+                    run_end_ns,
+                    status=RunEndStatus.ABORTED.value,
+                    reason=error_msg,
+                )
+                return SessionResult(
+                    run_start_ns=run_start_ns,
+                    run_end_ns=run_end_ns,
+                    status=status,
+                    error=error_msg,
+                )
+
+            planned_t0_ns = int(self.request.t0_ns)
+            now_ns = self.scheduler.now_ns()
+            if now_ns > planned_t0_ns:
+                run_start_ns = now_ns
+                self.logger.log_event(
+                    onset_ns=now_ns,
+                    event_type="run_start_adjusted",
+                    planned_t0_ns=planned_t0_ns,
+                    adjusted_t0_ns=run_start_ns,
+                )
+                self.request.t0_ns = run_start_ns
+            else:
+                run_start_ns = planned_t0_ns
+
+            run_start_ns = self.scheduler.start(run_start_ns)
+            self.logger.log_status(
+                StatusKind.RUN_STARTED, run_start_ns, bids_stem=self.request.bids_stem
+            )
+            self._notify_recorders(
+                "on_run_started", run_start_ns, recorders=started_recorders
+            )
+            for trial in self.trials:
+                trial.on_run_start(run_start_ns)
+            run_started_emitted = True
+
+            for trial in self.trials:
+                if abort_requested:
+                    break
+                for phase_index, phase in enumerate(trial.phases):
+                    if abort_requested:
+                        break
+                    window = self.scheduler.reserve(phase.duration_s)
+
+                    self.logger.log_status(
+                        StatusKind.PHASE_STARTED,
+                        window.start_ns,
+                        trial_nr=trial.trial_nr,
+                        phase=phase_index,
+                        phase_name=phase.name,
+                    )
+                    self.logger.log_event(
+                        onset_ns=window.start_ns,
+                        event_type=phase.name,
+                        trial_nr=trial.trial_nr,
+                        phase=phase_index,
+                        duration_ns=window.end_ns - window.start_ns,
+                    )
+                    self._notify_recorders(
+                        "on_phase_started",
+                        trial_nr=trial.trial_nr,
+                        phase_index=phase_index,
+                        phase_name=phase.name,
+                        phase_start_ns=window.start_ns,
+                        phase_end_ns=window.end_ns,
+                        recorders=started_recorders,
+                    )
+
+                    next_flip_ns = window.start_ns
+                    while next_flip_ns < window.end_ns and not abort_requested:
+                        now_ns = self.scheduler.now_ns()
+                        if now_ns > next_flip_ns + (2 * frame_step_ns):
+                            # Resynchronize to prevent runaway backlog.
+                            next_flip_ns = now_ns
+
+                        batch = trial.draw(phase_index=phase_index, now_ns=now_ns)
+                        self.backend.draw(batch)
+
+                        flip = self.backend.flip(target_ns=next_flip_ns)
+                        self.logger.log_flip(
+                            timestamp_ns=flip.timestamp_ns,
+                            target_ns=flip.target_ns,
+                            frame_index=flip.frame_index,
+                            late_ns=flip.late_ns,
+                            dropped_frames=flip.dropped_frames,
+                            trial_nr=trial.trial_nr,
+                            phase=phase_index,
+                        )
+                        self._notify_recorders(
+                            "on_flip",
+                            frame_index=flip.frame_index,
+                            timestamp_ns=flip.timestamp_ns,
+                            trial_nr=trial.trial_nr,
+                            phase_index=phase_index,
+                            recorders=started_recorders,
+                        )
+
+                        for cmd in batch.commands:
+                            self.logger.log_stimulus(
+                                timestamp_ns=flip.timestamp_ns,
+                                trial_nr=trial.trial_nr,
+                                phase=phase_index,
+                                kind=cmd.kind,
+                                params=self._sanitize_stim_params(cmd.params),
+                            )
+
+                        for event in self.backend.poll_input():
+                            if str(event.key).lower() == "q":
+                                abort_requested = True
+                                abort_reason = "q_key"
+                                self.logger.log_event(
+                                    onset_ns=event.timestamp_ns,
+                                    event_type="abort",
+                                    trial_nr=trial.trial_nr,
+                                    phase=phase_index,
+                                    response=event.key,
+                                )
+                                self.logger.log_status(
+                                    StatusKind.EVENT,
+                                    event.timestamp_ns,
+                                    trial_nr=trial.trial_nr,
+                                    phase=phase_index,
+                                    key=event.key,
+                                    event_type="abort",
+                                )
+                                self._notify_recorders(
+                                    "on_input",
+                                    key=event.key,
+                                    timestamp_ns=event.timestamp_ns,
+                                    event_type="abort",
+                                    trial_nr=trial.trial_nr,
+                                    phase_index=phase_index,
+                                    recorders=started_recorders,
+                                )
+                                break
+
+                            event_type, status_kind = self._event_type_for_key(event.key)
+                            self.logger.log_event(
+                                onset_ns=event.timestamp_ns,
+                                event_type=event_type,
+                                trial_nr=trial.trial_nr,
+                                phase=phase_index,
+                                response=event.key,
+                            )
+                            self.logger.log_status(
+                                status_kind,
+                                event.timestamp_ns,
+                                trial_nr=trial.trial_nr,
+                                phase=phase_index,
+                                key=event.key,
+                            )
+                            trial.on_input(event, phase_index=phase_index)
+                            self._notify_recorders(
+                                "on_input",
+                                key=event.key,
+                                timestamp_ns=event.timestamp_ns,
+                                event_type=event_type,
+                                trial_nr=trial.trial_nr,
+                                phase_index=phase_index,
+                                recorders=started_recorders,
+                            )
+
+                        next_flip_ns += frame_step_ns
+
+            run_end_ns = time.monotonic_ns()
+            if abort_requested:
+                status = RunEndStatus.ABORTED
+                self.logger.log_status(
+                    StatusKind.RUN_ENDED,
+                    run_end_ns,
+                    status=RunEndStatus.ABORTED.value,
+                    reason=abort_reason or "abort_requested",
+                )
+            else:
+                self.logger.log_status(
+                    StatusKind.RUN_ENDED, run_end_ns, status=RunEndStatus.OK.value
+                )
+
+        except Exception as exc:
+            run_end_ns = time.monotonic_ns()
+            status = RunEndStatus.ERROR
+            error_msg = str(exc)
+            self.logger.log_status(
+                StatusKind.RUN_ENDED,
+                run_end_ns,
+                status=RunEndStatus.ERROR.value,
+                error=error_msg,
+            )
+            raise
+
+        finally:
+            if run_started_emitted:
+                self._notify_recorders(
+                    "on_run_ended",
+                    run_end_ns=run_end_ns,
+                    status=status,
+                    error=error_msg,
+                    recorders=started_recorders,
+                )
+            self._stop_recorders(started_recorders)
+            self.backend.shutdown()
+            self.logger.finalize(run_start_ns=run_start_ns, run_end_ns=run_end_ns)
+
+        return SessionResult(
+            run_start_ns=run_start_ns,
+            run_end_ns=run_end_ns,
+            status=status,
+            error=error_msg,
+        )

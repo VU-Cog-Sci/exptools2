@@ -1,0 +1,33 @@
+run:
+  sub: "001"
+  ses: "01"
+  task: "demo"
+  run: "01"
+  backend: "headless"
+  output_root: "logs"
+  seed: 123
+  contract_version: "1.1"
+  scanner_trigger_mode:
+    mode: "none"
+    params: {}
+
+display:
+  width: 1280
+  height: 720
+  refresh_hz: 60
+  fullscreen: false
+  vsync: true
+
+conditions:
+  rows:
+    - phase_name: "gabor"
+      duration_s: 0.25
+      draw_command:
+        kind: "gabor"
+        orientation_deg: 45
+        spatial_freq: 3
+    - phase_name: "fix"
+      duration_s: 0.25
+      draw_command:
+        kind: "shape"
+        shape: "circle"
