@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import math
 import random
 import time
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
 from .contract import validate_run_request
 from .interfaces import DisplayBackend
 from .logger import RunLogger
+from .runtime_priority import (
+    RuntimePriorityConfig,
+    RuntimePriorityResult,
+    apply_runtime_priority,
+)
 from .scheduler import NonSlipScheduler
 from .trial import Trial
 from .types import DisplayConfig, DrawBatch, RunEndStatus, RunRequest, StatusKind
@@ -33,6 +40,7 @@ class Session:
         scheduler: NonSlipScheduler | None = None,
         recorders: list[Any] | None = None,
         prelude: dict[str, Any] | None = None,
+        runtime_priority: RuntimePriorityConfig | None = None,
     ) -> None:
         validate_run_request(request)
         self.request = request
@@ -42,6 +50,8 @@ class Session:
         self.scheduler = scheduler or NonSlipScheduler(t0_ns=request.t0_ns)
         self.recorders = list(recorders or [])
         self.prelude = dict(prelude or {})
+        self.runtime_priority = runtime_priority or RuntimePriorityConfig()
+        self.runtime_priority_result: RuntimePriorityResult | None = None
         self.trials: list[Trial] = []
         random.seed(request.seed)
 
@@ -50,6 +60,336 @@ class Session:
 
     def add_trials(self, trials: list[Trial]) -> None:
         self.trials.extend(trials)
+
+    @staticmethod
+    def _fmt_seconds(seconds: float) -> str:
+        total = max(0.0, float(seconds))
+        hours = int(total // 3600)
+        minutes = int((total % 3600) // 60)
+        secs = total % 60.0
+        return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+
+    @staticmethod
+    def _percentile(values: list[float], p: float) -> float:
+        if not values:
+            return 0.0
+        ordered = sorted(values)
+        idx = int(round((len(ordered) - 1) * max(0.0, min(1.0, p))))
+        return float(ordered[idx])
+
+    @staticmethod
+    def _safe_mean(values: list[float]) -> float:
+        if not values:
+            return 0.0
+        return float(sum(values) / len(values))
+
+    def _planned_phase_rows(self) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for trial in self.trials:
+            for phase_index, phase in enumerate(trial.phases):
+                rows.append(
+                    {
+                        "trial_nr": int(trial.trial_nr),
+                        "phase_index": int(phase_index),
+                        "phase_name": str(phase.name),
+                        "duration_s": float(phase.duration_s),
+                    }
+                )
+        return rows
+
+    def _build_pre_run_summary(
+        self,
+        planned_t0_ns: int,
+        planned_phase_rows: list[dict[str, Any]],
+    ) -> tuple[str, dict[str, Any]]:
+        planned_duration_s = float(
+            sum(float(row.get("duration_s", 0.0)) for row in planned_phase_rows)
+        )
+        phase_counts: Counter[str] = Counter(
+            str(row.get("phase_name", "unknown")) for row in planned_phase_rows
+        )
+        phase_durations: dict[str, float] = {}
+        for row in planned_phase_rows:
+            key = str(row.get("phase_name", "unknown"))
+            phase_durations[key] = phase_durations.get(key, 0.0) + float(
+                row.get("duration_s", 0.0)
+            )
+
+        monitor_desc = (
+            f"index={self.display_config.monitor_index}"
+            if self.display_config.monitor_index is not None
+            else f"name={self.display_config.monitor_name}"
+        )
+        frame_period_s = 1.0 / max(self.display_config.refresh_hz, 1.0)
+        est_frames = int(math.ceil(planned_duration_s / frame_period_s))
+
+        instruction_cfg = self._prelude_section("instruction")
+        fixation_cfg = self._prelude_section("fixation_wait")
+        prelude_enabled = bool(self.prelude.get("enabled", False))
+        prelude_text = "yes" if (instruction_cfg.get("text") or self.prelude.get("instruction_text")) else "no"
+        prelude_image = "yes" if (instruction_cfg.get("image") or self.prelude.get("instruction_image")) else "no"
+        fixation_wait_enabled = bool(
+            fixation_cfg.get("enabled", self.prelude.get("show_fixation_wait", True))
+        )
+
+        lines: list[str] = []
+        lines.append("=== exptools2 Run Plan ===")
+        lines.append(f"Run ID: {self.request.bids_stem}")
+        lines.append(f"Backend: {self.logger.backend}")
+        lines.append(f"Seed: {self.request.seed}")
+        lines.append(
+            "Display: "
+            f"{self.display_config.width}x{self.display_config.height} @ {self.display_config.refresh_hz:.3f} Hz, "
+            f"fullscreen={self.display_config.fullscreen}, vsync={self.display_config.vsync}, "
+            f"monitor({monitor_desc})"
+        )
+        lines.append(
+            "Runtime priority request: "
+            f"enabled={self.runtime_priority.enabled}, "
+            f"linux_policy={self.runtime_priority.linux_policy}, "
+            f"linux_priority={self.runtime_priority.linux_priority}, "
+            f"macos_qos={self.runtime_priority.macos_qos}, "
+            f"nice_fallback={self.runtime_priority.allow_nice_fallback}, "
+            f"nice_value={self.runtime_priority.nice_value}"
+        )
+        lines.append(
+            "Scanner trigger mode: "
+            f"{self.request.scanner_trigger_mode.mode} "
+            f"{self.request.scanner_trigger_mode.params}"
+        )
+        lines.append(
+            "Prelude: "
+            f"enabled={prelude_enabled}, instruction_text={prelude_text}, "
+            f"instruction_image={prelude_image}, fixation_wait={fixation_wait_enabled}"
+        )
+        lines.append(
+            f"Planned trials/phases: {len(self.trials)} trials, {len(planned_phase_rows)} phases"
+        )
+        lines.append(
+            "Planned duration: "
+            f"{self._fmt_seconds(planned_duration_s)} ({planned_duration_s:.3f} s)"
+        )
+        lines.append(
+            "Frame target: "
+            f"{frame_period_s * 1000.0:.3f} ms ({self.display_config.refresh_hz:.3f} Hz), "
+            f"estimated flips={est_frames}"
+        )
+        lines.append(f"Requested t0_ns: {int(planned_t0_ns)}")
+        lines.append("Phase breakdown:")
+        for phase_name in sorted(phase_counts.keys()):
+            lines.append(
+                f"  - {phase_name}: n={phase_counts[phase_name]}, "
+                f"total={phase_durations.get(phase_name, 0.0):.3f} s"
+            )
+        lines.append("Outputs:")
+        lines.append(f"  - events: {self.logger.paths.events_tsv}")
+        lines.append(f"  - events sidecar: {self.logger.paths.events_json}")
+        lines.append(f"  - run log: {self.logger.paths.log_h5}")
+        lines.append(f"  - report: {self.logger.report_path}")
+        lines.append(f"  - manifest: {self.logger.paths.manifest_json}")
+        text = "\n".join(lines)
+        payload = {
+            "n_trials": len(self.trials),
+            "n_phases": len(planned_phase_rows),
+            "planned_duration_s": planned_duration_s,
+            "estimated_flips": est_frames,
+            "refresh_hz": float(self.display_config.refresh_hz),
+        }
+        return text, payload
+
+    def _build_post_run_summary(
+        self,
+        run_start_ns: int,
+        run_end_ns: int,
+        status: RunEndStatus,
+        error: str | None,
+        planned_phase_rows: list[dict[str, Any]],
+        planned_t0_ns: int,
+    ) -> tuple[str, dict[str, Any]]:
+        run_duration_s = max(0.0, (int(run_end_ns) - int(run_start_ns)) / 1_000_000_000.0)
+        planned_duration_s = float(
+            sum(float(row.get("duration_s", 0.0)) for row in planned_phase_rows)
+        )
+        drift_ms = (run_duration_s - planned_duration_s) * 1000.0
+        start_adjust_ms = (int(run_start_ns) - int(planned_t0_ns)) / 1_000_000.0
+
+        event_types = Counter(str(row.get("event_type", "")) for row in self.logger.events)
+        response_keys = Counter(
+            str(row.get("response"))
+            for row in self.logger.events
+            if row.get("event_type") in {"response", "pulse", "abort"}
+            and row.get("response") not in {None, ""}
+        )
+
+        flip_count = len(self.logger.flip_records)
+        dropped_total = int(
+            sum(int(row.get("dropped_frames", 0) or 0) for row in self.logger.flip_records)
+        )
+        late_ms: list[float] = [
+            max(0.0, float(int(row.get("late_ns", 0) or 0)) / 1_000_000.0)
+            for row in self.logger.flip_records
+        ]
+        frame_budget_ms = 1000.0 / max(self.display_config.refresh_hz, 1.0)
+        on_time_count = sum(1 for value in late_ms if value <= frame_budget_ms * 0.5)
+
+        interval_ms: list[float] = []
+        jitter_ms: list[float] = []
+        ts_values = [
+            int(row.get("timestamp_ns"))
+            for row in self.logger.flip_records
+            if row.get("timestamp_ns") is not None
+        ]
+        for idx in range(1, len(ts_values)):
+            delta_ms = (ts_values[idx] - ts_values[idx - 1]) / 1_000_000.0
+            interval_ms.append(delta_ms)
+            jitter_ms.append(delta_ms - frame_budget_ms)
+        rms_jitter_ms = (
+            math.sqrt(sum(v * v for v in jitter_ms) / len(jitter_ms)) if jitter_ms else 0.0
+        )
+
+        phase_lookup: dict[tuple[int, int], float] = {}
+        for row in planned_phase_rows:
+            key = (int(row["trial_nr"]), int(row["phase_index"]))
+            phase_lookup[key] = float(row["duration_s"])
+        phase_start_rows = [
+            status_row
+            for status_row in self.logger.statuses
+            if status_row.kind == StatusKind.PHASE_STARTED
+        ]
+        phase_abs_error_ms: list[float] = []
+        for idx, row in enumerate(phase_start_rows):
+            start_ns = int(row.timestamp_ns)
+            if idx + 1 < len(phase_start_rows):
+                end_ns = int(phase_start_rows[idx + 1].timestamp_ns)
+            else:
+                if status != RunEndStatus.OK:
+                    # On aborted/error runs, the last phase is intentionally truncated.
+                    continue
+                end_ns = int(run_end_ns)
+            observed_s = (end_ns - start_ns) / 1_000_000_000.0
+            trial_nr = row.payload.get("trial_nr")
+            phase_index = row.payload.get("phase")
+            if trial_nr is None or phase_index is None:
+                continue
+            planned_s = phase_lookup.get((int(trial_nr), int(phase_index)))
+            if planned_s is None:
+                continue
+            phase_abs_error_ms.append(abs((observed_s - planned_s) * 1000.0))
+
+        lines: list[str] = []
+        lines.append("=== exptools2 Run Report ===")
+        lines.append(f"Run ID: {self.request.bids_stem}")
+        lines.append(
+            f"Status: {status.value}" + (f" (error={error})" if error else "")
+        )
+        lines.append(
+            "Run timing: "
+            f"actual={self._fmt_seconds(run_duration_s)} ({run_duration_s:.3f} s), "
+            f"planned={self._fmt_seconds(planned_duration_s)} ({planned_duration_s:.3f} s), "
+            f"drift={drift_ms:+.2f} ms"
+        )
+        if self.runtime_priority_result is not None:
+            lines.append(
+                "Runtime priority: "
+                f"attempted={self.runtime_priority_result.attempted}, "
+                f"applied={self.runtime_priority_result.applied}, "
+                f"strategy={self.runtime_priority_result.strategy}"
+            )
+            if self.runtime_priority_result.details:
+                lines.append(
+                    "Runtime priority details: "
+                    + "; ".join(str(item) for item in self.runtime_priority_result.details)
+                )
+            if self.runtime_priority_result.errors:
+                lines.append(
+                    "Runtime priority errors: "
+                    + "; ".join(str(item) for item in self.runtime_priority_result.errors)
+                )
+        lines.append(
+            f"Run start adjustment: {start_adjust_ms:+.2f} ms (actual_start - requested_t0)"
+        )
+        lines.append(
+            "Behavior: "
+            f"responses={event_types.get('response', 0)}, pulses={event_types.get('pulse', 0)}, "
+            f"aborts={event_types.get('abort', 0)}"
+        )
+        if response_keys:
+            top_keys = ", ".join(
+                f"{key}:{count}" for key, count in response_keys.most_common(10)
+            )
+            lines.append(f"Behavior key distribution: {top_keys}")
+        else:
+            lines.append("Behavior key distribution: (none)")
+        lines.append(
+            "Flip timing: "
+            f"n={flip_count}, dropped={dropped_total}, "
+            f"on_time(<=0.5 frame)={on_time_count}/{flip_count if flip_count else 1}"
+        )
+        lines.append(
+            "Flip lateness (ms): "
+            f"mean={self._safe_mean(late_ms):.3f}, "
+            f"p95={self._percentile(late_ms, 0.95):.3f}, "
+            f"max={max(late_ms) if late_ms else 0.0:.3f}"
+        )
+        late_median = self._percentile(late_ms, 0.5)
+        late_centered_abs_p95 = self._percentile(
+            [abs(value - late_median) for value in late_ms], 0.95
+        )
+        lines.append(
+            "Flip lateness (phase-offset corrected, ms): "
+            f"median_offset={late_median:.3f}, "
+            f"|late-median|_p95={late_centered_abs_p95:.3f}"
+        )
+        lines.append(
+            "Flip interval/jitter (ms): "
+            f"interval_mean={self._safe_mean(interval_ms):.3f}, "
+            f"jitter_rms={rms_jitter_ms:.3f}, "
+            f"|jitter|_p95={self._percentile([abs(v) for v in jitter_ms], 0.95):.3f}"
+        )
+        if flip_count > 0 and late_median > (frame_budget_ms * 0.5):
+            lines.append(
+                "Timing note: absolute lateness includes a mostly constant vblank phase offset; "
+                "use jitter and offset-corrected lateness to assess stability."
+            )
+        lines.append(
+            "Phase timing error (abs ms): "
+            f"mean={self._safe_mean(phase_abs_error_ms):.3f}, "
+            f"p95={self._percentile(phase_abs_error_ms, 0.95):.3f}, "
+            f"max={max(phase_abs_error_ms) if phase_abs_error_ms else 0.0:.3f}"
+        )
+        lines.append(
+            "Streams: "
+            f"stim_frames={len(self.logger.stim_trace)}, "
+            f"video_records={len(self.logger.video_records)}, "
+            f"audio_records={len(self.logger.audio_records)}"
+        )
+        lines.append(f"Report path: {self.logger.report_path}")
+        text = "\n".join(lines)
+        payload = {
+            "status": status.value,
+            "run_duration_s": run_duration_s,
+            "planned_duration_s": planned_duration_s,
+            "run_drift_ms": drift_ms,
+            "responses": int(event_types.get("response", 0)),
+            "pulses": int(event_types.get("pulse", 0)),
+            "abort_events": int(event_types.get("abort", 0)),
+            "flip_count": flip_count,
+            "flip_late_mean_ms": self._safe_mean(late_ms),
+            "flip_late_p95_ms": self._percentile(late_ms, 0.95),
+            "flip_late_max_ms": max(late_ms) if late_ms else 0.0,
+            "flip_late_median_ms": late_median,
+            "flip_late_centered_abs_p95_ms": late_centered_abs_p95,
+            "flip_jitter_rms_ms": rms_jitter_ms,
+            "phase_timing_abs_mean_ms": self._safe_mean(phase_abs_error_ms),
+            "phase_timing_abs_p95_ms": self._percentile(phase_abs_error_ms, 0.95),
+            "runtime_priority_applied": bool(
+                self.runtime_priority_result.applied if self.runtime_priority_result else False
+            ),
+            "runtime_priority_strategy": (
+                self.runtime_priority_result.strategy if self.runtime_priority_result else "none"
+            ),
+        }
+        return text, payload
 
     def _event_type_for_key(self, key: str) -> tuple[str, StatusKind]:
         scanner_key = self.request.scanner_trigger_mode.params.get("key", "5")
@@ -525,7 +865,15 @@ class Session:
         return True
 
     def run(self) -> SessionResult:
-        run_start_ns = int(self.request.t0_ns)
+        planned_t0_ns = int(self.request.t0_ns)
+        planned_phase_rows = self._planned_phase_rows()
+        pre_run_summary_text = ""
+        pre_run_summary_payload: dict[str, Any] = {}
+        pre_summary_event_logged = False
+        post_run_summary_text = ""
+        post_run_summary_payload: dict[str, Any] = {}
+
+        run_start_ns = planned_t0_ns
         run_end_ns = run_start_ns
         frame_step_ns = int(1_000_000_000 / max(self.display_config.refresh_hz, 1.0))
 
@@ -537,8 +885,16 @@ class Session:
         run_started_emitted = False
 
         try:
+            self.runtime_priority_result = apply_runtime_priority(self.runtime_priority)
+            self.logger.metadata["runtime_priority"] = self.runtime_priority_result.as_dict()
             self.backend.initialize(self.display_config)
             started_recorders = self._start_recorders()
+            pre_run_summary_text, pre_run_summary_payload = self._build_pre_run_summary(
+                planned_t0_ns=planned_t0_ns,
+                planned_phase_rows=planned_phase_rows,
+            )
+            print(pre_run_summary_text, flush=True)
+
             if not self._run_prelude():
                 run_end_ns = time.monotonic_ns()
                 status = RunEndStatus.ABORTED
@@ -556,7 +912,6 @@ class Session:
                     error=error_msg,
                 )
 
-            planned_t0_ns = int(self.request.t0_ns)
             now_ns = self.scheduler.now_ns()
             if now_ns > planned_t0_ns:
                 run_start_ns = now_ns
@@ -580,6 +935,13 @@ class Session:
             for trial in self.trials:
                 trial.on_run_start(run_start_ns)
             run_started_emitted = True
+            self.logger.log_event(
+                onset_ns=run_start_ns,
+                event_type="run_plan_summary",
+                summary_text=pre_run_summary_text,
+                **pre_run_summary_payload,
+            )
+            pre_summary_event_logged = True
 
             for trial in self.trials:
                 if abort_requested:
@@ -736,6 +1098,61 @@ class Session:
             raise
 
         finally:
+            if not pre_run_summary_text:
+                pre_run_summary_text, pre_run_summary_payload = self._build_pre_run_summary(
+                    planned_t0_ns=planned_t0_ns,
+                    planned_phase_rows=planned_phase_rows,
+                )
+                print(pre_run_summary_text, flush=True)
+            if run_started_emitted and not pre_summary_event_logged:
+                self.logger.log_event(
+                    onset_ns=run_start_ns,
+                    event_type="run_plan_summary",
+                    summary_text=pre_run_summary_text,
+                    **pre_run_summary_payload,
+                )
+                pre_summary_event_logged = True
+
+            timing_dashboard_path = self.logger.write_timing_dashboard(
+                run_start_ns=run_start_ns,
+                run_end_ns=run_end_ns,
+                refresh_hz=self.display_config.refresh_hz,
+            )
+
+            post_run_summary_text, post_run_summary_payload = self._build_post_run_summary(
+                run_start_ns=run_start_ns,
+                run_end_ns=run_end_ns,
+                status=status,
+                error=error_msg,
+                planned_phase_rows=planned_phase_rows,
+                planned_t0_ns=planned_t0_ns,
+            )
+            if timing_dashboard_path is not None:
+                post_run_summary_text = (
+                    f"{post_run_summary_text}\nTiming dashboard: {timing_dashboard_path}"
+                )
+                post_run_summary_payload["timing_dashboard"] = str(timing_dashboard_path)
+            else:
+                dash_error = str(self.logger.metadata.get("timing_dashboard_error", "")).strip()
+                if dash_error:
+                    post_run_summary_text = (
+                        f"{post_run_summary_text}\n"
+                        f"Timing dashboard: not generated ({dash_error})"
+                    )
+                    post_run_summary_payload["timing_dashboard_error"] = dash_error
+            print(post_run_summary_text, flush=True)
+
+            if run_started_emitted:
+                self.logger.log_event(
+                    onset_ns=run_end_ns,
+                    event_type="run_result_summary",
+                    duration_ns=max(0, run_end_ns - run_start_ns),
+                    summary_text=post_run_summary_text,
+                    **post_run_summary_payload,
+                )
+            self.logger.metadata["run_plan_summary"] = pre_run_summary_payload
+            self.logger.metadata["run_result_summary"] = post_run_summary_payload
+
             if run_started_emitted:
                 self._notify_recorders(
                     "on_run_ended",
@@ -746,6 +1163,11 @@ class Session:
                 )
             self._stop_recorders(started_recorders)
             self.backend.shutdown()
+            report_sections = [pre_run_summary_text, post_run_summary_text]
+            report_text = "\n\n".join(section for section in report_sections if section).strip()
+            if report_text:
+                report_text += "\n"
+            self.logger.write_text_report(report_text)
             self.logger.finalize(run_start_ns=run_start_ns, run_end_ns=run_end_ns)
 
         return SessionResult(

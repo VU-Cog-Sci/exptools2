@@ -14,7 +14,17 @@ import numpy as np
 import yaml
 
 from exptools2.backends.headless import HeadlessDisplayBackend
-from exptools2.core import DisplayConfig, Phase, RunLogger, RunRequest, ScannerTriggerMode, Session, Trial, make_bids_stem
+from exptools2.core import (
+    DisplayConfig,
+    Phase,
+    RunLogger,
+    RunRequest,
+    RuntimePriorityConfig,
+    ScannerTriggerMode,
+    Session,
+    Trial,
+    make_bids_stem,
+)
 from exptools2.core.types import DrawBatch, InputEvent
 
 try:
@@ -344,12 +354,11 @@ def create_fixation_event_times(total_time: float, design_cfg: dict[str, Any], s
 
     exponentials = rng.exponential(float(design_cfg["exponential_ifi_mean"]), nr_events)
     gaussians = rng.normal(0.0, float(design_cfg["gaussian_ifi_sd"]), nr_events)
-    offsets = np.ones(nr_events) * float(design_cfg["offset_ifi_duration"])
     minimum = float(design_cfg["minimal_ifi_duration"])
+    offset = float(design_cfg["offset_ifi_duration"])
 
-    durations = exponentials + gaussians + offsets
+    durations = exponentials + gaussians + offset
     durations = durations[durations > minimum]
-    durations[durations < offsets] = minimum
 
     return np.cumsum(durations) + float(design_cfg["start_duration"])
 
@@ -706,6 +715,9 @@ def run_prf_experiment(
         )
 
     display_cfg = settings.get("display", {})
+    runtime_priority_cfg = RuntimePriorityConfig.from_mapping(
+        settings.get("runtime_priority", settings.get("runtime", {}).get("priority"))
+    )
     prelude_cfg = dict(settings.get("prelude", {}))
     prelude_cfg.setdefault("enabled", backend_name != "headless")
     prelude_cfg.setdefault("background_color", [0.5, 0.5, 0.5, 1.0])
@@ -761,6 +773,7 @@ def run_prf_experiment(
         ),
         recorders=recorders,
         prelude=prelude_cfg,
+        runtime_priority=runtime_priority_cfg,
     )
 
     # Build trials/fixation schedule in the same spirit as the original pRF design.

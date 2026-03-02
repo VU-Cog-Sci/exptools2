@@ -37,7 +37,7 @@ class DummyRecorder:
         return [("dummy_recorder_artifact", self._artifact)]
 
 
-def test_session_starts_stops_recorders_and_registers_artifacts(tmp_path: Path) -> None:
+def test_session_starts_stops_recorders_and_registers_artifacts(tmp_path: Path, capsys) -> None:
     request = RunRequest(
         bids_stem="sub-001_ses-01_task-demo_run-01",
         condition_row={"demo": True},
@@ -65,13 +65,25 @@ def test_session_starts_stops_recorders_and_registers_artifacts(tmp_path: Path) 
     )
 
     result = session.run()
+    out = capsys.readouterr().out
     assert result.status.value == "ok"
     assert recorder.started is True
     assert recorder.stopped is True
     assert recorder.run_started is True
     assert recorder.run_ended is True
+    assert "=== exptools2 Run Plan ===" in out
+    assert "=== exptools2 Run Report ===" in out
+
+    report_path = logger.report_path
+    assert report_path.exists()
+    report_text = report_path.read_text(encoding="utf8")
+    assert "=== exptools2 Run Plan ===" in report_text
+    assert "=== exptools2 Run Report ===" in report_text
+    assert "Runtime priority:" in report_text
+    assert "runtime_priority" in logger.metadata
+    assert isinstance(logger.metadata["runtime_priority"], dict)
 
     manifest = json.loads(logger.paths.manifest_json.read_text(encoding="utf8"))
     kinds = [row["kind"] for row in manifest.get("artifacts", [])]
     assert "dummy_recorder_artifact" in kinds
-
+    assert "run_report" in kinds

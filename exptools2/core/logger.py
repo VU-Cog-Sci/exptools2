@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
-import csv
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -43,6 +43,16 @@ class RunLogger:
             manifest_json=bids_artifact_path(
                 self.output_root, self.bids_stem, "manifest", "json"
             ),
+        )
+
+    @property
+    def report_path(self) -> Path:
+        return bids_artifact_path(self.output_root, self.bids_stem, "report", "txt")
+
+    @property
+    def timing_dashboard_path(self) -> Path:
+        return bids_artifact_path(
+            self.output_root, self.bids_stem, "timing_dashboard", "png"
         )
 
     def _hash_file(self, path: Path) -> str:
@@ -194,6 +204,7 @@ class RunLogger:
                         payload, separators=(",", ":"), default=self._json_default
                     ).encode("utf8"),
                 )
+                self._write_h5_timing_tables(h5f=h5f, run_start_ns=run_start_ns)
         else:
             # Lightweight fallback: preserve path/extension and store JSON payload.
             paths.log_h5.write_text(
@@ -220,6 +231,299 @@ class RunLogger:
         )
         self.register_artifact(paths.manifest_json, kind="manifest")
         return manifest
+
+    @staticmethod
+    def _coerce_int(value: Any, default: int = -1) -> int:
+        if value is None:
+            return default
+        try:
+            return int(value)
+        except Exception:
+            return default
+
+    def _write_h5_timing_tables(self, h5f: Any, run_start_ns: int) -> None:
+        import numpy as np
+
+        try:
+            import h5py
+        except Exception:  # pragma: no cover
+            return
+
+        str_dtype = h5py.string_dtype(encoding="utf-8")
+        run_start_ns_i = int(run_start_ns)
+
+        flip_group = h5f.create_group("flips")
+        flip_rows = list(self.flip_records)
+        n_flips = len(flip_rows)
+
+        def flip_int(key: str, default: int = -1) -> np.ndarray:
+            return np.asarray(
+                [self._coerce_int(row.get(key), default=default) for row in flip_rows],
+                dtype=np.int64,
+            )
+
+        ts_ns = flip_int("timestamp_ns")
+        target_ns = flip_int("target_ns")
+        frame_index = flip_int("frame_index")
+        late_ns = flip_int("late_ns", default=0)
+        dropped_frames = flip_int("dropped_frames", default=0)
+        trial_nr = flip_int("trial_nr")
+        phase = flip_int("phase")
+
+        flip_group.create_dataset("timestamp_ns", data=ts_ns)
+        flip_group.create_dataset("target_ns", data=target_ns)
+        flip_group.create_dataset("frame_index", data=frame_index)
+        flip_group.create_dataset("late_ns", data=late_ns)
+        flip_group.create_dataset("dropped_frames", data=dropped_frames)
+        flip_group.create_dataset("trial_nr", data=trial_nr)
+        flip_group.create_dataset("phase", data=phase)
+        if n_flips > 0:
+            timestamp_s = ts_ns.astype(np.float64)
+            timestamp_s = (timestamp_s - float(run_start_ns_i)) / 1_000_000_000.0
+            target_s = target_ns.astype(np.float64)
+            target_s = (target_s - float(run_start_ns_i)) / 1_000_000_000.0
+            target_s[target_ns < 0] = np.nan
+            late_ms = late_ns.astype(np.float64) / 1_000_000.0
+            interval_ms = np.full(n_flips, np.nan, dtype=np.float64)
+            if n_flips >= 2:
+                interval_ms[1:] = np.diff(ts_ns.astype(np.float64)) / 1_000_000.0
+        else:
+            timestamp_s = np.asarray([], dtype=np.float64)
+            target_s = np.asarray([], dtype=np.float64)
+            late_ms = np.asarray([], dtype=np.float64)
+            interval_ms = np.asarray([], dtype=np.float64)
+
+        flip_group.create_dataset("timestamp_s", data=timestamp_s)
+        flip_group.create_dataset("target_s", data=target_s)
+        flip_group.create_dataset("late_ms", data=late_ms)
+        flip_group.create_dataset("interval_ms", data=interval_ms)
+
+        flip_json_rows = [
+            json.dumps(row, separators=(",", ":"), default=self._json_default)
+            for row in flip_rows
+        ]
+        flip_group.create_dataset(
+            "raw_json",
+            data=np.asarray(flip_json_rows, dtype=object),
+            dtype=str_dtype,
+        )
+
+        input_group = h5f.create_group("inputs")
+        input_rows = [
+            row
+            for row in self.events
+            if str(row.get("event_type")) in {"response", "pulse", "abort"}
+        ]
+        onset_ns = np.asarray(
+            [self._coerce_int(row.get("onset_ns")) for row in input_rows], dtype=np.int64
+        )
+        onset_s = (onset_ns.astype(np.float64) - float(run_start_ns_i)) / 1_000_000_000.0
+        trial_vals = np.asarray(
+            [self._coerce_int(row.get("trial_nr")) for row in input_rows], dtype=np.int64
+        )
+        phase_vals = np.asarray(
+            [self._coerce_int(row.get("phase")) for row in input_rows], dtype=np.int64
+        )
+        event_type_vals = np.asarray(
+            [str(row.get("event_type", "")) for row in input_rows], dtype=object
+        )
+        response_vals = np.asarray(
+            [str(row.get("response", "")) if row.get("response") is not None else "" for row in input_rows],
+            dtype=object,
+        )
+        input_group.create_dataset("onset_ns", data=onset_ns)
+        input_group.create_dataset("onset_s", data=onset_s)
+        input_group.create_dataset("trial_nr", data=trial_vals)
+        input_group.create_dataset("phase", data=phase_vals)
+        input_group.create_dataset("event_type", data=event_type_vals, dtype=str_dtype)
+        input_group.create_dataset("response", data=response_vals, dtype=str_dtype)
+        input_json_rows = [
+            json.dumps(row, separators=(",", ":"), default=self._json_default)
+            for row in input_rows
+        ]
+        input_group.create_dataset(
+            "raw_json",
+            data=np.asarray(input_json_rows, dtype=object),
+            dtype=str_dtype,
+        )
+
+    def write_timing_dashboard(
+        self,
+        run_start_ns: int,
+        run_end_ns: int,
+        refresh_hz: float | None = None,
+        kind: str = "timing_dashboard",
+    ) -> Path | None:
+        try:
+            import matplotlib
+
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            import numpy as np
+        except Exception as exc:
+            self.metadata["timing_dashboard_error"] = (
+                f"{exc.__class__.__name__}: {exc}"
+            )
+            return None
+
+        run_start_ns_i = int(run_start_ns)
+        run_end_ns_i = int(run_end_ns)
+        run_duration_s = max(0.0, (run_end_ns_i - run_start_ns_i) / 1_000_000_000.0)
+        expected_interval_ms = 1000.0 / float(refresh_hz) if refresh_hz else None
+
+        ts_ns = np.asarray(
+            [self._coerce_int(row.get("timestamp_ns")) for row in self.flip_records],
+            dtype=np.int64,
+        )
+        late_ms = np.asarray(
+            [self._coerce_int(row.get("late_ns"), default=0) / 1_000_000.0 for row in self.flip_records],
+            dtype=np.float64,
+        )
+        dropped_frames = np.asarray(
+            [self._coerce_int(row.get("dropped_frames"), default=0) for row in self.flip_records],
+            dtype=np.int64,
+        )
+        ts_s = (ts_ns.astype(np.float64) - float(run_start_ns_i)) / 1_000_000_000.0
+        interval_ms = (
+            np.diff(ts_ns.astype(np.float64)) / 1_000_000.0 if ts_ns.size >= 2 else np.asarray([], dtype=np.float64)
+        )
+        interval_t_s = ts_s[1:] if ts_s.size >= 2 else np.asarray([], dtype=np.float64)
+
+        input_rows = [
+            row
+            for row in self.events
+            if str(row.get("event_type")) in {"response", "pulse", "abort"}
+        ]
+        input_t_s = np.asarray(
+            [
+                (self._coerce_int(row.get("onset_ns")) - run_start_ns_i) / 1_000_000_000.0
+                for row in input_rows
+            ],
+            dtype=np.float64,
+        )
+        input_type = [str(row.get("event_type")) for row in input_rows]
+        response_t_s = np.asarray(
+            [
+                (self._coerce_int(row.get("onset_ns")) - run_start_ns_i) / 1_000_000_000.0
+                for row in input_rows
+                if str(row.get("event_type")) == "response"
+            ],
+            dtype=np.float64,
+        )
+        response_ibi_ms = (
+            np.diff(response_t_s) * 1000.0
+            if response_t_s.size >= 2
+            else np.asarray([], dtype=np.float64)
+        )
+
+        fig, axes = plt.subplots(2, 3, figsize=(16, 9))
+        fig.suptitle(
+            f"Timing Dashboard: {self.bids_stem}\n"
+            f"duration={run_duration_s:.3f}s, flips={ts_ns.size}, inputs={len(input_rows)}"
+        )
+
+        ax = axes[0, 0]
+        if interval_ms.size > 0:
+            ax.plot(interval_t_s, interval_ms, lw=1.0, color="#1f77b4")
+            if expected_interval_ms is not None:
+                ax.axhline(
+                    expected_interval_ms,
+                    color="#d62728",
+                    lw=1.0,
+                    ls="--",
+                    label=f"target {expected_interval_ms:.3f} ms",
+                )
+                ax.legend(loc="upper right", fontsize=8)
+        else:
+            ax.text(0.5, 0.5, "No flip intervals", ha="center", va="center", transform=ax.transAxes)
+        ax.set_title("Flip Intervals Over Time")
+        ax.set_xlabel("Time since run start (s)")
+        ax.set_ylabel("Interval (ms)")
+
+        ax = axes[0, 1]
+        if interval_ms.size > 0:
+            bins = min(80, max(10, int(round(np.sqrt(interval_ms.size)))))
+            ax.hist(interval_ms, bins=bins, color="#2ca02c", alpha=0.85)
+            if expected_interval_ms is not None:
+                ax.axvline(expected_interval_ms, color="#d62728", lw=1.0, ls="--")
+        else:
+            ax.text(0.5, 0.5, "No flip intervals", ha="center", va="center", transform=ax.transAxes)
+        ax.set_title("Flip Interval Distribution")
+        ax.set_xlabel("Interval (ms)")
+        ax.set_ylabel("Count")
+
+        ax = axes[0, 2]
+        if ts_s.size > 0:
+            ax.plot(ts_s, late_ms, lw=0.9, color="#ff7f0e")
+            if expected_interval_ms is not None:
+                ax.axhline(expected_interval_ms * 0.5, color="#d62728", lw=1.0, ls="--")
+        else:
+            ax.text(0.5, 0.5, "No flips", ha="center", va="center", transform=ax.transAxes)
+        ax.set_title("Flip Lateness Over Time")
+        ax.set_xlabel("Time since run start (s)")
+        ax.set_ylabel("Lateness (ms)")
+
+        ax = axes[1, 0]
+        if ts_s.size > 0:
+            ax.step(ts_s, dropped_frames, where="post", color="#9467bd", lw=1.0)
+            ax.set_ylim(bottom=0)
+        else:
+            ax.text(0.5, 0.5, "No flips", ha="center", va="center", transform=ax.transAxes)
+        ax.set_title("Dropped Frames By Flip")
+        ax.set_xlabel("Time since run start (s)")
+        ax.set_ylabel("Dropped frames")
+
+        ax = axes[1, 1]
+        if input_t_s.size > 0:
+            y_map = {"response": 0, "pulse": 1, "abort": 2}
+            y = np.asarray([y_map.get(kind, 3) for kind in input_type], dtype=np.float64)
+            ax.scatter(input_t_s, y, s=18, alpha=0.85, color="#8c564b")
+            ax.set_yticks([0, 1, 2, 3], labels=["response", "pulse", "abort", "other"])
+        else:
+            ax.text(0.5, 0.5, "No input events", ha="center", va="center", transform=ax.transAxes)
+        ax.set_title("Input Event Timeline")
+        ax.set_xlabel("Time since run start (s)")
+        ax.set_ylabel("Event type")
+
+        ax = axes[1, 2]
+        if response_ibi_ms.size > 0:
+            bins = min(60, max(10, int(round(np.sqrt(response_ibi_ms.size)))))
+            ax.hist(response_ibi_ms, bins=bins, color="#17becf", alpha=0.9)
+        else:
+            ax.text(
+                0.5,
+                0.5,
+                "Not enough responses for IBI",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+            )
+        ax.set_title("Response Intervals (IBI)")
+        ax.set_xlabel("Inter-response interval (ms)")
+        ax.set_ylabel("Count")
+
+        fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94))
+        path = self.timing_dashboard_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(path, dpi=160)
+        plt.close(fig)
+        self.register_artifact(
+            path=path,
+            kind=kind,
+            metadata={
+                "run_start_ns": run_start_ns_i,
+                "run_end_ns": run_end_ns_i,
+                "refresh_hz": float(refresh_hz) if refresh_hz is not None else None,
+            },
+        )
+        return path
+
+    def write_text_report(self, text: str, kind: str = "run_report") -> Path:
+        path = self.report_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(text), encoding="utf8")
+        self.register_artifact(path=path, kind=kind)
+        return path
 
     def finalize(self, run_start_ns: int, run_end_ns: int) -> ArtifactPaths:
         self._write_events(run_start_ns=run_start_ns)

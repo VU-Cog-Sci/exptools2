@@ -8,10 +8,12 @@ from typing import Any
 from exptools2.backends.godot import GodotConfig, GodotRunner, UDPConfig
 from exptools2.backends.headless import HeadlessDisplayBackend
 from exptools2.core import (
+    apply_runtime_priority,
     ConditionTrial,
     ConditionsLoader,
     DisplayConfig,
     Phase,
+    RuntimePriorityConfig,
     RunLogger,
     RunRequest,
     ScannerTriggerMode,
@@ -155,8 +157,13 @@ def run_from_config(path: str | Path) -> dict[str, Any]:
         backend=backend_name,
         metadata={"config_path": str(path)},
     )
+    runtime_priority_cfg = RuntimePriorityConfig.from_mapping(
+        cfg.get("runtime_priority", cfg.get("runtime", {}).get("priority"))
+    )
 
     if backend_name == "godot":
+        runtime_priority_result = apply_runtime_priority(runtime_priority_cfg)
+        logger.metadata["runtime_priority"] = runtime_priority_result.as_dict()
         godot_cfg = cfg.get("godot", {})
         display_cfg = cfg.get("display", {})
         scene = godot_cfg.get("scene")
@@ -264,6 +271,7 @@ def run_from_config(path: str | Path) -> dict[str, Any]:
         ),
         recorders=recorders,
         prelude=prelude_cfg,
+        runtime_priority=runtime_priority_cfg,
     )
 
     session.add_trials(build_trials(rows))

@@ -53,3 +53,22 @@ def test_bar_visible_periodic_blanking() -> None:
     # First half of each interval: blank, second half: visible.
     assert module._bar_visible(0.01, bar_blank_duration=0.02, bar_blank_interval=0.04) is False
     assert module._bar_visible(0.03, bar_blank_duration=0.02, bar_blank_interval=0.04) is True
+
+
+def test_fixation_event_times_no_broadcast_shape_mismatch() -> None:
+    module = _load_resolver()
+    design_cfg = {
+        "offset_ifi_duration": 1.0,
+        "minimal_ifi_duration": 1.5,
+        "gaussian_ifi_sd": 1.5,
+        "exponential_ifi_mean": 1.5,
+        "start_duration": 4.0,
+    }
+    events = module.create_fixation_event_times(
+        total_time=488.0,
+        design_cfg=design_cfg,
+        seed=18,
+    )
+    assert events.ndim == 1
+    assert events.size > 0
+    assert float(events[0]) > design_cfg["start_duration"]

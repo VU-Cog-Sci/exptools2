@@ -21,9 +21,9 @@ stimuli:
 
 design:
   offset_ifi_duration: 1.0
-  minimal_ifi_duration: 0.5
-  gaussian_ifi_sd: 0.125
-  exponential_ifi_mean: 0.25
+  minimal_ifi_duration: 1.5
+  gaussian_ifi_sd: 1.5
+  exponential_ifi_mean: 1.5
   start_duration: 4.0
   end_duration: 16.0
   bar_duration: 12.0
@@ -47,6 +47,15 @@ display:
   hide_cursor: true
   monitor_name: "primary"
   monitor_index: 0
+
+runtime_priority:
+  enabled: false
+  linux_policy: "fifo"      # fifo | rr
+  linux_priority: 10        # clamped to system-allowed range
+  macos_qos: "user_interactive"  # background|utility|default|user_initiated|user_interactive
+  macos_relative_priority: 0
+  allow_nice_fallback: true
+  nice_value: -10
 
 eyelink:
   enabled: false

@@ -8,6 +8,7 @@ from .contract import (
 )
 from .interfaces import DisplayBackend, Stimulus, VideoPlayer
 from .logger import RunLogger
+from .runtime_priority import RuntimePriorityConfig, apply_runtime_priority
 from .scheduler import NonSlipScheduler
 from .session import Session, SessionResult
 from .trial import ConditionTrial, Trial
@@ -39,6 +40,7 @@ __all__ = [
     "RunLogger",
     "RunRequest",
     "RunStatus",
+    "RuntimePriorityConfig",
     "ScannerTriggerMode",
     "Session",
     "SessionResult",
@@ -49,6 +51,7 @@ __all__ = [
     "bids_output_dir",
     "make_bids_stem",
     "parse_bids_stem",
+    "apply_runtime_priority",
     "load_contract_schema",
     "validate_run_request",
 ]
